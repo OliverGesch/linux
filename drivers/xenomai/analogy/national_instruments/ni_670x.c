@@ -1,0 +1,1 @@
+/Volumes/Repositories/vagrant/github/linux/xenomai-3.0-rc4/kernel/drivers/analogy/national_instruments/ni_670x.c
