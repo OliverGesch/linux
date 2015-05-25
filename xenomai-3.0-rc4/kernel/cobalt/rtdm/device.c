@@ -192,23 +192,23 @@ static ssize_t type_show(struct device *kdev,
 
 }
 
-// #ifdef ATTRIBUTE_GROUPS
+#ifdef ATTRIBUTE_GROUPS
 
-// static DEVICE_ATTR_RO(profile);
-// static DEVICE_ATTR_RO(refcount);
-// static DEVICE_ATTR_RO(flags);
-// static DEVICE_ATTR_RO(type);
+static DEVICE_ATTR_RO(profile);
+static DEVICE_ATTR_RO(refcount);
+static DEVICE_ATTR_RO(flags);
+static DEVICE_ATTR_RO(type);
 
-// static struct attribute *rtdm_attrs[] = {
-// 	&dev_attr_profile.attr,
-// 	&dev_attr_refcount.attr,
-// 	&dev_attr_flags.attr,
-// 	&dev_attr_type.attr,
-// 	NULL,
-// };
-// ATTRIBUTE_GROUPS(rtdm);
+static struct attribute *rtdm_attrs[] = {
+	&dev_attr_profile.attr,
+	&dev_attr_refcount.attr,
+	&dev_attr_flags.attr,
+	&dev_attr_type.attr,
+	NULL,
+};
+ATTRIBUTE_GROUPS(rtdm);
 
-// #else /* !ATTRIBUTE_GROUPS */
+#else /* !ATTRIBUTE_GROUPS */
 
 /*
  * Cope with legacy sysfs attributes. Scheduled for removal when 3.10
@@ -225,7 +225,7 @@ static struct device_attribute rtdm_attrs[] = {
 #define dev_groups   dev_attrs
 #define rtdm_groups  rtdm_attrs
 
-// #endif /* !ATTRIBUTE_GROUPS */
+#endif /* !ATTRIBUTE_GROUPS */
 
 static int state_change_notifier(struct notifier_block *nb,
 				 unsigned long action, void *data)
