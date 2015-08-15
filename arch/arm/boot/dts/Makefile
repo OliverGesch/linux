@@ -125,6 +125,7 @@ dtb-$(CONFIG_ARCH_MXC) += \
 	imx6dl-wandboard.dtb \
 	imx6q-wandboard.dtb \
 	imx6dl-edm1-cf.dtb \
+	imx6q-picosom.dtb \
 	imx6dl-picosom.dtb \
 	imx6q-arm2.dtb \
 	imx6q-sabreauto.dtb \
@@ -168,6 +169,7 @@ dtb-$(CONFIG_ARCH_MXC) += \
 	imx6sx-sabreauto.dtb \
 	imx6sx-sabreauto-m4.dtb \
 	imx6sx-edm1-cf.dtb \
+	imx6sx-edm1-cf-m4.dtb \
 	vf610-twr.dtb
 dtb-$(CONFIG_ARCH_MXS) += imx23-evk.dtb \
 	imx23-olinuxino.dtb \
