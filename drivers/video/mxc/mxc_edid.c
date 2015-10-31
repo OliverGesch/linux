@@ -1,5 +1,5 @@
 /*
- * Copyright 2009-2013 Freescale Semiconductor, Inc. All Rights Reserved.
+ * Copyright 2009-2014 Freescale Semiconductor, Inc. All Rights Reserved.
  */
 
 /*
@@ -28,7 +28,7 @@
  */
 #include <linux/i2c.h>
 #include <linux/fb.h>
-#include <mach/mxc_edid.h>
+#include <video/mxc_edid.h>
 #include "../edid.h"
 
 #undef DEBUG  /* define this for verbose EDID parsing output */
@@ -277,7 +277,7 @@ int mxc_edid_parse_ext_blk(unsigned char *edid,
 	int i, num = 0, revision;
 
 	if (edid[index++] != 0x2) /* only support cea ext block now */
-		return -1;
+		return 0;
 	revision = edid[index++];
 	DPRINTK("cea extent revision %d\n", revision);
 	mode = kzalloc(50 * sizeof(struct fb_videomode), GFP_KERNEL);
@@ -701,7 +701,6 @@ int mxc_edid_var_to_vic(struct fb_var_screeninfo *var)
 
 	return i;
 }
-
 EXPORT_SYMBOL(mxc_edid_var_to_vic);
 
 int mxc_edid_mode_to_vic(const struct fb_videomode *mode)
@@ -742,6 +741,10 @@ int mxc_edid_read(struct i2c_adapter *adp, unsigned short addr,
 
 	if (extblknum) {
 		int i;
+
+		/* FIXME: mxc_edid_readsegblk() won't read more than 2 blocks
+		 * and the for-loop will read past the end of the buffer! :-( */
+		BUG_ON(extblknum > 3);
 
 		/* need read segment block? */
 		if (extblknum > 1) {

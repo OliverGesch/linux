@@ -1,7 +1,7 @@
 /*
  * Freescale UUT driver
  *
- * Copyright 2008-2011 Freescale Semiconductor, Inc.
+ * Copyright 2008-2013 Freescale Semiconductor, Inc.
  * Copyright 2008-2009 Embedded Alley Solutions, Inc All Rights Reserved.
  */
 
@@ -21,7 +21,7 @@
 #include <linux/list.h>
 #include <linux/vmalloc.h>
 #include <linux/ioctl.h>
-#include <mach/hardware.h>
+/* #include <mach/hardware.h> */
 
 static int utp_init(struct fsg_dev *fsg);
 static void utp_exit(struct fsg_dev *fsg);
@@ -58,7 +58,7 @@ static int utp_handle_message(struct fsg_dev *fsg,
 
 #define UTP_COMMAND_SIZE	80
 
-#define UTP_SS_EXIT(fsg, r) 	utp_set_sense(fsg, UTP_REPLY_EXIT, (u64)r)
+#define UTP_SS_EXIT(fsg, r)	utp_set_sense(fsg, UTP_REPLY_EXIT, (u64)r)
 #define UTP_SS_PASS(fsg)	utp_set_sense(fsg, UTP_REPLY_PASS, 0)
 #define UTP_SS_BUSY(fsg, r)	utp_set_sense(fsg, UTP_REPLY_BUSY, (u64)r)
 #define UTP_SS_SIZE(fsg, r)	utp_set_sense(fsg, UTP_REPLY_SIZE, (u64)r)
@@ -105,12 +105,13 @@ static const struct file_operations utp_fops = {
 	.open	= nonseekable_open,
 	.read	= utp_file_read,
 	.write	= utp_file_write,
-	.unlocked_ioctl = utp_ioctl,
+	/* .ioctl  = utp_ioctl, */
+	.unlocked_ioctl  = utp_ioctl,
 };
 
 static struct miscdevice utp_dev = {
-	.minor 	= UTP_MINOR,
-	.name 	= "utp",
+	.minor	= UTP_MINOR,
+	.name	= "utp",
 	.fops	= &utp_fops,
 };
 
@@ -119,8 +120,8 @@ static struct miscdevice utp_dev = {
 #define UTP_FLAG_STATUS		0x00000004
 #define UTP_FLAG_REPORT_BUSY	0x10000000
 struct utp_message {
-	u32 	flags;
-	size_t 	size;
+	u32	flags;
+	size_t	size;
 	union {
 		struct {
 			u64 payload;
@@ -135,7 +136,7 @@ struct utp_message {
 };
 
 struct utp_user_data {
-	struct  list_head 	link;
+	struct  list_head	link;
 	struct  utp_message	data;
 };
 #pragma pack()

@@ -1,7 +1,7 @@
 /*
  * Freescale UUT driver
  *
- * Copyright 2008-2012 Freescale Semiconductor, Inc.
+ * Copyright 2008-2013 Freescale Semiconductor, Inc.
  * Copyright 2008-2009 Embedded Alley Solutions, Inc All Rights Reserved.
  */
 
@@ -149,38 +149,18 @@ static ssize_t utp_file_write(struct file *file, const char __user *buf,
 	return size;
 }
 
+/*
+ * uuc should change to use soc bus infrastructure to soc information
+ * /sys/devices/soc0/soc_id
+ * this function can be removed.
+ */
 static long
-utp_ioctl(struct file *file,
-	      unsigned int cmd, unsigned long arg)
+utp_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 {
 	int cpu_id = 0;
+
 	switch (cmd) {
 	case UTP_GET_CPU_ID:
-/* Currently, it only supports below SoC for manufacture tool
- * The naming rule
- * 1. The numberic for SoC string
- * 2. If there is next SoC version, and the corresponding utp
- * operation will be differ, then, need to add '1' next to SoC
- * name. Such as the next 50 SoC version is: cpu_is = 501
- */
-#ifdef CONFIG_ARCH_MXS
-		if (cpu_is_mx23())
-			cpu_id = 23;
-		else if (cpu_is_mx28())
-			cpu_id = 28;
-#endif
-#ifdef CONFIG_ARCH_MXC
-		if (cpu_is_mx25())
-			cpu_id = 25;
-		else if (cpu_is_mx35())
-			cpu_id = 35;
-		else if (cpu_is_mx51())
-			cpu_id = 51;
-		else if (cpu_is_mx53())
-			cpu_id = 53;
-		else if (cpu_is_mx50())
-			cpu_id = 50;
-#endif
 		return put_user(cpu_id, (int __user *)arg);
 	default:
 		return -ENOIOCTLCMD;
@@ -221,12 +201,12 @@ static int utp_do_read(struct fsg_dev *fsg, void *data, size_t size)
 		 *	the next page.
 		 * If this means reading 0 then we were asked to read past
 		 *	the end of file. */
-		amount = min((unsigned int) amount_left, mod_data.buflen);
+		amount = min((unsigned int) amount_left, FSG_BUFLEN);
 
 		/* Wait for the next buffer to become available */
-		bh = fsg->next_buffhd_to_fill;
+		bh = fsg->common->next_buffhd_to_fill;
 		while (bh->state != BUF_STATE_EMPTY) {
-			rc = sleep_thread(fsg);
+			rc = sleep_thread(fsg->common);
 			if (rc)
 				return rc;
 		}
@@ -245,7 +225,7 @@ static int utp_do_read(struct fsg_dev *fsg, void *data, size_t size)
 		/* from upt buffer to file_storeage buffer */
 		memcpy(bh->buf, data + size - amount_left, amount);
 		amount_left  -= amount;
-		fsg->residue -= amount;
+		fsg->common->residue -= amount;
 
 		bh->inreq->length = amount;
 		bh->state = BUF_STATE_FULL;
@@ -257,7 +237,7 @@ static int utp_do_read(struct fsg_dev *fsg, void *data, size_t size)
 		start_transfer(fsg, fsg->bulk_in, bh->inreq,
 				&bh->inreq_busy, &bh->state);
 
-		fsg->next_buffhd_to_fill = bh->next;
+		fsg->common->next_buffhd_to_fill = bh->next;
 
 		if (amount_left <= 0)
 			break;
@@ -286,7 +266,7 @@ static int utp_do_write(struct fsg_dev *fsg, void *data, size_t size)
 	while (amount_left_to_write > 0) {
 
 		/* Queue a request for more data from the host */
-		bh = fsg->next_buffhd_to_fill;
+		bh = fsg->common->next_buffhd_to_fill;
 		if (bh->state == BUF_STATE_EMPTY && get_some_more) {
 
 			/* Figure out how much we want to get:
@@ -298,7 +278,7 @@ static int utp_do_write(struct fsg_dev *fsg, void *data, size_t size)
 			 * If this means getting 0, then we were asked
 			 *	to write past the end of file.
 			 * Finally, round down to a block boundary. */
-			amount = min(amount_left_to_req, mod_data.buflen);
+			amount = min(amount_left_to_req, FSG_BUFLEN);
 
 			if (amount == 0) {
 				get_some_more = 0;
@@ -318,17 +298,17 @@ static int utp_do_write(struct fsg_dev *fsg, void *data, size_t size)
 			bh->outreq->short_not_ok = 1;
 			start_transfer(fsg, fsg->bulk_out, bh->outreq,
 					&bh->outreq_busy, &bh->state);
-			fsg->next_buffhd_to_fill = bh->next;
+			fsg->common->next_buffhd_to_fill = bh->next;
 			continue;
 		}
 
 		/* Write the received data to the backing file */
-		bh = fsg->next_buffhd_to_drain;
+		bh = fsg->common->next_buffhd_to_drain;
 		if (bh->state == BUF_STATE_EMPTY && !get_some_more)
 			break;			/* We stopped early */
 		if (bh->state == BUF_STATE_FULL) {
 			smp_rmb();
-			fsg->next_buffhd_to_drain = bh->next;
+			fsg->common->next_buffhd_to_drain = bh->next;
 			bh->state = BUF_STATE_EMPTY;
 
 			/* Did something go wrong with the transfer? */
@@ -345,18 +325,18 @@ static int utp_do_write(struct fsg_dev *fsg, void *data, size_t size)
 			if (signal_pending(current))
 				return -EINTR;		/* Interrupted!*/
 			amount_left_to_write -= amount;
-			fsg->residue -= amount;
+			fsg->common->residue -= amount;
 
 			/* Did the host decide to stop early? */
 			if (bh->outreq->actual != bh->outreq->length) {
-				fsg->short_packet_received = 1;
+				fsg->common->short_packet_received = 1;
 				break;
 			}
 			continue;
 		}
 
 		/* Wait for something to happen */
-		rc = sleep_thread(fsg);
+		rc = sleep_thread(fsg->common);
 		if (rc)
 			return rc;
 	}
@@ -474,39 +454,39 @@ static int utp_exec(struct fsg_dev *fsg,
 static int utp_send_status(struct fsg_dev *fsg)
 {
 	struct fsg_buffhd	*bh;
-	u8			status = USB_STATUS_PASS;
+	u8			status = US_BULK_STAT_OK;
 	struct bulk_cs_wrap	*csw;
-	int 			rc;
+	int			rc;
 
 	/* Wait for the next buffer to become available */
-	bh = fsg->next_buffhd_to_fill;
+	bh = fsg->common->next_buffhd_to_fill;
 	while (bh->state != BUF_STATE_EMPTY) {
-		rc = sleep_thread(fsg);
+		rc = sleep_thread(fsg->common);
 		if (rc)
 			return rc;
 	}
 
-	if (fsg->phase_error) {
+	if (fsg->common->phase_error) {
 		DBG(fsg, "sending phase-error status\n");
-		status = USB_STATUS_PHASE_ERROR;
+		status = US_BULK_STAT_PHASE;
 
 	} else if ((UTP_CTX(fsg)->sd & 0xFFFF) != UTP_REPLY_PASS) {
-		status = USB_STATUS_FAIL;
+		status = US_BULK_STAT_FAIL;
 	}
 
 	csw = bh->buf;
 
 	/* Store and send the Bulk-only CSW */
-	csw->Signature = __constant_cpu_to_le32(USB_BULK_CS_SIG);
-	csw->Tag = fsg->tag;
-	csw->Residue = cpu_to_le32(fsg->residue);
+	csw->Signature = __constant_cpu_to_le32(US_BULK_CS_SIGN);
+	csw->Tag = fsg->common->tag;
+	csw->Residue = cpu_to_le32(fsg->common->residue);
 	csw->Status = status;
 
-	bh->inreq->length = USB_BULK_CS_WRAP_LEN;
+	bh->inreq->length = US_BULK_CS_WRAP_LEN;
 	bh->inreq->zero = 0;
 	start_transfer(fsg, fsg->bulk_in, bh->inreq,
 			&bh->inreq_busy, &bh->state);
-	fsg->next_buffhd_to_fill = bh->next;
+	fsg->common->next_buffhd_to_fill = bh->next;
 	return 0;
 }
 
@@ -541,27 +521,29 @@ static int utp_handle_message(struct fsg_dev *fsg,
 		break;
 	case UTP_EXEC:
 		pr_debug("%s: EXEC\n", __func__);
-		data = vmalloc(fsg->data_size);
-		memset(data, 0, fsg->data_size);
+		data = vmalloc(fsg->common->data_size);
+		memset(data, 0, fsg->common->data_size);
 		/* copy data from usb buffer to utp buffer */
-		utp_do_write(fsg, data, fsg->data_size);
-		utp_exec(fsg, data, fsg->data_size, param);
+		utp_do_write(fsg, data, fsg->common->data_size);
+		utp_exec(fsg, data, fsg->common->data_size, param);
 		vfree(data);
 		break;
 	case UTP_GET: /* data from device to host */
-		pr_debug("%s: GET, %d bytes\n", __func__, fsg->data_size);
-		r = utp_do_read(fsg, UTP_CTX(fsg)->buffer, fsg->data_size);
+		pr_debug("%s: GET, %d bytes\n", __func__,
+					fsg->common->data_size);
+		r = utp_do_read(fsg, UTP_CTX(fsg)->buffer,
+					fsg->common->data_size);
 		UTP_SS_PASS(fsg);
 		break;
 	case UTP_PUT:
 		utp_context.cur_state =  UTP_FLAG_DATA;
-		pr_debug("%s: PUT, Received %d bytes\n", __func__, fsg->data_size);/* data from host to device */
-		uud2r = utp_user_data_alloc(fsg->data_size);
+		pr_debug("%s: PUT, Received %d bytes\n", __func__, fsg->common->data_size);/* data from host to device */
+		uud2r = utp_user_data_alloc(fsg->common->data_size);
 		if (!uud2r)
 			return -ENOMEM;
-		uud2r->data.bufsize = fsg->data_size;
+		uud2r->data.bufsize = fsg->common->data_size;
 		uud2r->data.flags = UTP_FLAG_DATA;
-		utp_do_write(fsg, uud2r->data.data, fsg->data_size);
+		utp_do_write(fsg, uud2r->data.data, fsg->common->data_size);
 		/* don't know what will be written */
 		mutex_lock(&UTP_CTX(fsg)->lock);
 		list_add_tail(&uud2r->link, &UTP_CTX(fsg)->read);
@@ -610,4 +592,3 @@ static int utp_handle_message(struct fsg_dev *fsg,
 	utp_send_status(fsg);
 	return -1;
 }
-

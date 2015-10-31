@@ -9,9 +9,11 @@
 #include <linux/gpio.h>
 #include <linux/io.h>
 #include <asm/proc-fns.h>
+#include <asm/system_misc.h>
 
 #include <mach/regs-ost.h>
 #include <mach/reset.h>
+#include <mach/smemc.h>
 
 unsigned int reset_status;
 EXPORT_SYMBOL(reset_status);
@@ -76,19 +78,29 @@ static void do_gpio_reset(void)
 static void do_hw_reset(void)
 {
 	/* Initialize the watchdog and let it fire */
-	OWER = OWER_WME;
-	OSSR = OSSR_M3;
-	OSMR3 = OSCR + 368640;	/* ... in 100 ms */
+	writel_relaxed(OWER_WME, OWER);
+	writel_relaxed(OSSR_M3, OSSR);
+	/* ... in 100 ms */
+	writel_relaxed(readl_relaxed(OSCR) + 368640, OSMR3);
+	/*
+	 * SDRAM hangs on watchdog reset on Marvell PXA270 (erratum 71)
+	 * we put SDRAM into self-refresh to prevent that
+	 */
+	while (1)
+		writel_relaxed(MDREFR_SLFRSH, MDREFR);
 }
 
-void arch_reset(char mode, const char *cmd)
+void pxa_restart(char mode, const char *cmd)
 {
+	local_irq_disable();
+	local_fiq_disable();
+
 	clear_reset_status(RESET_STATUS_ALL);
 
 	switch (mode) {
 	case 's':
 		/* Jump into ROM at address 0 */
-		cpu_reset(0);
+		soft_restart(0);
 		break;
 	case 'g':
 		do_gpio_reset();
@@ -99,4 +111,3 @@ void arch_reset(char mode, const char *cmd)
 		break;
 	}
 }
-

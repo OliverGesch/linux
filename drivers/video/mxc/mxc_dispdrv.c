@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011 Freescale Semiconductor, Inc. All Rights Reserved.
+ * Copyright (C) 2011-2014 Freescale Semiconductor, Inc. All Rights Reserved.
  */
 
 /*
@@ -22,10 +22,10 @@
  * Move all dev_suspend() things into fb_notifier for SUSPEND, if there is;
  * Move all dev_resume() things into fb_notifier for RESUME, if there is;
  *
- * ipuv3 fb driver could call mxc_dispdrv_gethandle(name, setting) before a fb
+ * mxc fb driver could call mxc_dispdrv_gethandle(name, setting) before a fb
  * need be added, with fbi param passing by setting, after
  * mxc_dispdrv_gethandle() return, FB driver should get the basic setting
- * about fbi info and ipuv3-hw (ipu_id and disp_id).
+ * about fbi info and crtc.
  *
  * @ingroup Framebuffer
  */
@@ -48,7 +48,22 @@ struct mxc_dispdrv_entry {
 	bool active;
 	void *priv;
 	struct list_head list;
+	struct device *dev;
 };
+
+void mxc_dispdrv_setdev(struct mxc_dispdrv_handle *drv_handle, struct device *dev)
+{
+	struct mxc_dispdrv_entry *dentry;
+	dentry = (struct mxc_dispdrv_entry *)drv_handle;
+	dentry->dev = dev;
+}
+
+struct device *mxc_dispdrv_getdev(struct mxc_dispdrv_handle *drv_handle)
+{
+	struct mxc_dispdrv_entry *dentry;
+	dentry = (struct mxc_dispdrv_entry *)drv_handle;
+	return dentry->dev;
+}
 
 struct mxc_dispdrv_handle *mxc_dispdrv_register(struct mxc_dispdrv_driver *drv)
 {

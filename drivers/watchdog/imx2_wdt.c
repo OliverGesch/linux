@@ -2,6 +2,7 @@
  * Watchdog driver for IMX2 and later processors
  *
  *  Copyright (C) 2010 Wolfram Sang, Pengutronix e.K. <w.sang@pengutronix.de>
+ *  Copyright (C) 2014 Freescale Semiconductor, Inc.
  *
  * some parts adapted by similar drivers from Darius Augulis and Vladimir
  * Zapolskiy, additional improvements by Wim Van Sebroeck.
@@ -21,6 +22,8 @@
  */
 
 #include <linux/init.h>
+#include <linux/interrupt.h>
+#include <linux/irq.h>
 #include <linux/kernel.h>
 #include <linux/miscdevice.h>
 #include <linux/module.h>
@@ -33,9 +36,6 @@
 #include <linux/uaccess.h>
 #include <linux/timer.h>
 #include <linux/jiffies.h>
-#include <linux/interrupt.h>
-#include <mach/hardware.h>
-#include <mach/irqs.h>
 
 #define DRIVER_NAME "imx2-wdt"
 
@@ -50,6 +50,8 @@
 #define IMX2_WDT_SEQ1		0x5555		/* -> service sequence 1 */
 #define IMX2_WDT_SEQ2		0xAAAA		/* -> service sequence 2 */
 
+#define IMX2_WDT_WRSR		0x04		/* Reset Status Register */
+#define IMX2_WDT_WRSR_TOUT	(1 << 1)	/* -> Reset due to Timeout */
 #define IMX2_WDT_WICR		0x06		/*Interrupt Control Register*/
 #define IMX2_WDT_WICR_WIE	(1 << 15)	/* -> Interrupt Enable */
 #define IMX2_WDT_WICR_WTIS	(1 << 14)	/* -> Interrupt Status */
@@ -76,8 +78,8 @@ static struct {
 
 static struct miscdevice imx2_wdt_miscdev;
 
-static int nowayout = WATCHDOG_NOWAYOUT;
-module_param(nowayout, int, 0);
+static bool nowayout = WATCHDOG_NOWAYOUT;
+module_param(nowayout, bool, 0);
 MODULE_PARM_DESC(nowayout, "Watchdog cannot be stopped once started (default="
 				__MODULE_STRING(WATCHDOG_NOWAYOUT) ")");
 
@@ -96,7 +98,7 @@ static inline void imx2_wdt_setup(void)
 {
 	u16 val = __raw_readw(imx2_wdt.base + IMX2_WDT_WCR);
 
-	/* Suspend watch dog timer in low power mode, write once-only */
+	/* Suspend timer in low power mode, write once-only */
 	val |= IMX2_WDT_WCR_WDZST;
 	/* Strip the old watchdog Time-Out value */
 	val &= ~IMX2_WDT_WCR_WT;
@@ -131,7 +133,7 @@ static void imx2_wdt_start(void)
 {
 	if (!test_and_set_bit(IMX2_WDT_STATUS_STARTED, &imx2_wdt.status)) {
 		/* at our first start we enable clock and do initialisations */
-		clk_enable(imx2_wdt.clk);
+		clk_prepare_enable(imx2_wdt.clk);
 
 		imx2_wdt_setup();
 	} else	/* delete the timer that pings the watchdog after close */
@@ -220,6 +222,7 @@ static long imx2_wdt_ioctl(struct file *file, unsigned int cmd,
 	void __user *argp = (void __user *)arg;
 	int __user *p = argp;
 	int new_value;
+	u16 val;
 
 	switch (cmd) {
 	case WDIOC_GETSUPPORT:
@@ -227,8 +230,12 @@ static long imx2_wdt_ioctl(struct file *file, unsigned int cmd,
 			sizeof(struct watchdog_info)) ? -EFAULT : 0;
 
 	case WDIOC_GETSTATUS:
-	case WDIOC_GETBOOTSTATUS:
 		return put_user(0, p);
+
+	case WDIOC_GETBOOTSTATUS:
+		val = __raw_readw(imx2_wdt.base + IMX2_WDT_WRSR);
+		new_value = val & IMX2_WDT_WRSR_TOUT ? WDIOF_CARDRESET : 0;
+		return put_user(new_value, p);
 
 	case WDIOC_KEEPALIVE:
 		imx2_wdt_ping();
@@ -303,35 +310,13 @@ static struct miscdevice imx2_wdt_miscdev = {
 static int __init imx2_wdt_probe(struct platform_device *pdev)
 {
 	int ret;
-	int res_size;
 	int irq;
 	struct resource *res;
 
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-	if (!res) {
-		dev_err(&pdev->dev, "can't get device resources\n");
-		return -ENODEV;
-	}
-
-	irq = platform_get_irq(pdev, 0);
-	if (irq < 0) {
-		dev_err(&pdev->dev, "can't get device irq number\n");
-		return -ENODEV;
-	}
-
-	res_size = resource_size(res);
-	if (!devm_request_mem_region(&pdev->dev, res->start, res_size,
-		res->name)) {
-		dev_err(&pdev->dev, "can't allocate %d bytes at %d address\n",
-			res_size, res->start);
-		return -ENOMEM;
-	}
-
-	imx2_wdt.base = devm_ioremap_nocache(&pdev->dev, res->start, res_size);
-	if (!imx2_wdt.base) {
-		dev_err(&pdev->dev, "ioremap failed\n");
-		return -ENOMEM;
-	}
+	imx2_wdt.base = devm_ioremap_resource(&pdev->dev, res);
+	if (IS_ERR(imx2_wdt.base))
+		return PTR_ERR(imx2_wdt.base);
 
 	imx2_wdt.clk = clk_get(&pdev->dev, NULL);
 	if (IS_ERR(imx2_wdt.clk)) {
@@ -339,9 +324,16 @@ static int __init imx2_wdt_probe(struct platform_device *pdev)
 		return PTR_ERR(imx2_wdt.clk);
 	}
 
-	ret = request_irq(irq, imx2_wdt_isr, 0, pdev->name, NULL);
+	irq = platform_get_irq(pdev, 0);
+	if (irq < 0) {
+		ret = irq;
+		goto fail;
+	}
+
+	ret = devm_request_irq(&pdev->dev, irq, imx2_wdt_isr, 0,
+			       dev_name(&pdev->dev), NULL);
 	if (ret) {
-		dev_err(&pdev->dev, "can't claim irq %d\n", irq);
+		dev_err(&pdev->dev, "can't get irq %d\n", irq);
 		goto fail;
 	}
 
@@ -398,26 +390,22 @@ static void imx2_wdt_shutdown(struct platform_device *pdev)
 	}
 }
 
+static const struct of_device_id imx2_wdt_dt_ids[] = {
+	{ .compatible = "fsl,imx21-wdt", },
+	{ /* sentinel */ }
+};
+
 static struct platform_driver imx2_wdt_driver = {
 	.remove		= __exit_p(imx2_wdt_remove),
 	.shutdown	= imx2_wdt_shutdown,
 	.driver		= {
 		.name	= DRIVER_NAME,
 		.owner	= THIS_MODULE,
+		.of_match_table = imx2_wdt_dt_ids,
 	},
 };
 
-static int __init imx2_wdt_init(void)
-{
-	return platform_driver_probe(&imx2_wdt_driver, imx2_wdt_probe);
-}
-module_init(imx2_wdt_init);
-
-static void __exit imx2_wdt_exit(void)
-{
-	platform_driver_unregister(&imx2_wdt_driver);
-}
-module_exit(imx2_wdt_exit);
+module_platform_driver_probe(imx2_wdt_driver, imx2_wdt_probe);
 
 MODULE_AUTHOR("Wolfram Sang");
 MODULE_DESCRIPTION("Watchdog driver for IMX2 and later");

@@ -34,6 +34,8 @@
 #define MLB_SET_ISOC_BLKSIZE_188 _IO('S', 0x17)
 #define MLB_SET_ISOC_BLKSIZE_196 _IO('S', 0x18)
 #define MLB_SET_SYNC_QUAD	_IOW('S', 0x19, unsigned int)
+#define MLB_IRQ_ENABLE		_IO('S', 0x20)
+#define MLB_IRQ_DISABLE		_IO('S', 0x21)
 
 /*!
  * MLB event define
@@ -49,9 +51,5 @@ enum {
 	MLB_EVT_RX_BRK_DETECT_PREV = 1 << 25,
 };
 
-#ifdef __KERNEL__
-extern void gpio_mlb_active(void);
-extern void gpio_mlb_inactive(void);
-#endif
 
 #endif				/* _MXC_MLB_H */

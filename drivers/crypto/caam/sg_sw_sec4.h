@@ -13,13 +13,11 @@ struct sec4_sg_entry;
 static inline void dma_to_sec4_sg_one(struct sec4_sg_entry *sec4_sg_ptr,
 				      dma_addr_t dma, u32 len, u32 offset)
 {
-#ifndef CONFIG_64BIT
-	sec4_sg_ptr->reserved = 0;	/* ensure MSB half is zeroed */
-#endif
 	sec4_sg_ptr->ptr = dma;
-	sec4_sg_ptr->len |= (len & SEC4_SG_LEN_MASK);
-	/* Does not add in buffer pool ID's at this time */
-	sec4_sg_ptr->bpid_offset = (offset & SEC4_SG_OFFS_MASK);
+	sec4_sg_ptr->len = len;
+	sec4_sg_ptr->reserved = 0;
+	sec4_sg_ptr->buf_pool_id = 0;
+	sec4_sg_ptr->offset = offset;
 #ifdef DEBUG
 	print_hex_dump(KERN_ERR, "sec4_sg_ptr@: ",
 		       DUMP_PREFIX_ADDRESS, 16, 4, sec4_sg_ptr,
@@ -93,10 +91,11 @@ static int dma_map_sg_chained(struct device *dev, struct scatterlist *sg,
 {
 	if (unlikely(chained)) {
 		int i;
-		struct scatterlist *tsg = sg;
-		/* Needs a temp copy for sg pointer, otherwise
-		 * scatterwalke_sg_next will return null when list is
-		 * ended */
+	struct scatterlist *tsg = sg;
+
+	/* We use a local copy of the sg pointer to avoid moving the
+	 * head of the list pointed to by sg as we wall the list.
+	 */
 		for (i = 0; i < nents; i++) {
 			dma_map_sg(dev, tsg, 1, dir);
 			tsg = scatterwalk_sg_next(tsg);
@@ -128,42 +127,4 @@ static int dma_unmap_sg_chained(struct device *dev, struct scatterlist *sg,
 		dma_unmap_sg(dev, sg, nents, dir);
 	}
 	return nents;
-}
-
-/* Copy from len bytes of sg to dest, starting from beginning */
-static inline void sg_copy(u8 *dest, struct scatterlist *sg, unsigned int len)
-{
-	struct scatterlist *current_sg = sg;
-	int cpy_index = 0, next_cpy_index = current_sg->length;
-
-	while (next_cpy_index < len) {
-		memcpy(dest + cpy_index, (u8 *) sg_virt(current_sg),
-		       current_sg->length);
-		current_sg = scatterwalk_sg_next(current_sg);
-		cpy_index = next_cpy_index;
-		next_cpy_index += current_sg->length;
-	}
-	if (cpy_index < len)
-		memcpy(dest + cpy_index, (u8 *) sg_virt(current_sg),
-		       len - cpy_index);
-}
-
-/* Copy sg data, from to_skip to end, to dest */
-static inline void sg_copy_part(u8 *dest, struct scatterlist *sg,
-				      int to_skip, unsigned int end)
-{
-	struct scatterlist *current_sg = sg;
-	int sg_index, cpy_index;
-
-	sg_index = current_sg->length;
-	while (sg_index <= to_skip) {
-		current_sg = scatterwalk_sg_next(current_sg);
-		sg_index += current_sg->length;
-	}
-	cpy_index = sg_index - to_skip;
-	memcpy(dest, (u8 *) sg_virt(current_sg) +
-	       current_sg->length - cpy_index, cpy_index);
-	current_sg = scatterwalk_sg_next(current_sg);
-	if (end - sg_index)
-		sg_copy(dest + cpy_index, current_sg, end - sg_index);
 }

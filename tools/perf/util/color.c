@@ -1,3 +1,4 @@
+#include <linux/kernel.h>
 #include "cache.h"
 #include "color.h"
 
@@ -182,12 +183,12 @@ static int __color_vsnprintf(char *bf, size_t size, const char *color,
 	}
 
 	if (perf_use_color_default && *color)
-		r += snprintf(bf, size, "%s", color);
-	r += vsnprintf(bf + r, size - r, fmt, args);
+		r += scnprintf(bf, size, "%s", color);
+	r += vscnprintf(bf + r, size - r, fmt, args);
 	if (perf_use_color_default && *color)
-		r += snprintf(bf + r, size - r, "%s", PERF_COLOR_RESET);
+		r += scnprintf(bf + r, size - r, "%s", PERF_COLOR_RESET);
 	if (trail)
-		r += snprintf(bf + r, size - r, "%s", trail);
+		r += scnprintf(bf + r, size - r, "%s", trail);
 	return r;
 }
 
@@ -200,7 +201,7 @@ static int __color_vfprintf(FILE *fp, const char *color, const char *fmt,
 	 * Auto-detect:
 	 */
 	if (perf_use_color_default < 0) {
-		if (isatty(1) || pager_in_use())
+		if (isatty(fileno(fp)) || pager_in_use())
 			perf_use_color_default = 1;
 		else
 			perf_use_color_default = 0;
@@ -317,8 +318,15 @@ int percent_color_fprintf(FILE *fp, const char *fmt, double percent)
 	return r;
 }
 
-int percent_color_snprintf(char *bf, size_t size, const char *fmt, double percent)
+int percent_color_snprintf(char *bf, size_t size, const char *fmt, ...)
 {
-	const char *color = get_percent_color(percent);
+	va_list args;
+	double percent;
+	const char *color;
+
+	va_start(args, fmt);
+	percent = va_arg(args, double);
+	va_end(args);
+	color = get_percent_color(percent);
 	return color_snprintf(bf, size, color, fmt, percent);
 }

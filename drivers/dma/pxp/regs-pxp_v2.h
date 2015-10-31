@@ -1,7 +1,7 @@
 /*
  * Freescale PXP Register Definitions
  *
- * Copyright (C) 2012 Freescale Semiconductor, Inc. All Rights Reserved.
+ * Copyright (C) 2012-2013 Freescale Semiconductor, Inc. All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -293,10 +293,10 @@
 #define BV_PXP_PS_CTRL_DECY__DECY2   0x1
 #define BV_PXP_PS_CTRL_DECY__DECY4   0x2
 #define BV_PXP_PS_CTRL_DECY__DECY8   0x3
-#define BP_PXP_PS_CTRL_RSVD0	  5
-#define BM_PXP_PS_CTRL_RSVD0 0x000000E0
-#define BF_PXP_PS_CTRL_RSVD0(v)  \
-	(((v) << 5) & BM_PXP_PS_CTRL_RSVD0)
+#define BP_PXP_PS_CTRL_SWAP 5
+#define BM_PXP_PS_CTRL_SWAP 0x000000E0
+#define BF_PXP_PS_CTRL_SWAP(v)  \
+	(((v) << 5) & BM_PXP_PS_CTRL_SWAP)
 #define BP_PXP_PS_CTRL_FORMAT	   0
 #define BM_PXP_PS_CTRL_FORMAT 0x0000001F
 #define BF_PXP_PS_CTRL_FORMAT(v)  \

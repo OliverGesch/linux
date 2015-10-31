@@ -1,5 +1,5 @@
 /*
- * Copyright 2005-2012 Freescale Semiconductor, Inc. All Rights Reserved.
+ * Copyright 2005-2013 Freescale Semiconductor, Inc. All Rights Reserved.
  */
 
 /*
@@ -13,20 +13,17 @@
 #ifndef __INCLUDE_IPU_PRV_H__
 #define __INCLUDE_IPU_PRV_H__
 
-#include <linux/types.h>
-#include <linux/device.h>
-#include <mach/clock.h>
 #include <linux/clkdev.h>
-#include <linux/interrupt.h>
+#include <linux/device.h>
 #include <linux/fsl_devices.h>
+#include <linux/interrupt.h>
+#include <linux/types.h>
 
 #define MXC_IPU_MAX_NUM		2
 #define MXC_DI_NUM_PER_IPU	2
 
 /* Globals */
 extern int dmfc_type_setup;
-extern struct clk ipu_pixel_clk[MXC_IPU_MAX_NUM][MXC_DI_NUM_PER_IPU];
-extern struct clk_lookup ipu_lookups[MXC_IPU_MAX_NUM][MXC_DI_NUM_PER_IPU];
 
 #define IDMA_CHAN_INVALID	0xFF
 #define HIGH_RESOLUTION_WIDTH	1024
@@ -47,14 +44,35 @@ enum csc_type_t {
 	CSC_NUM
 };
 
+enum imx_ipu_type {
+	IMX6Q_IPU,
+};
+
+struct ipu_pltfm_data {
+	u32 id;
+	u32 devtype;
+	int (*init) (int);
+	void (*pg) (int);
+
+	/*
+	 * Bypass reset to avoid display channel being
+	 * stopped by probe since it may starts to work
+	 * in bootloader.
+	 */
+	bool bypass_reset;
+};
+
 struct ipu_soc {
 	bool online;
+	struct ipu_pltfm_data *pdata;
 
 	/*clk*/
 	struct clk *ipu_clk;
 	struct clk *di_clk[2];
+	struct clk *di_clk_sel[2];
+	struct clk *pixel_clk[2];
+	struct clk *pixel_clk_sel[2];
 	struct clk *csi_clk[2];
-	struct clk pixel_clk[2];
 
 	/*irq*/
 	int irq_sync;
@@ -62,20 +80,20 @@ struct ipu_soc {
 	struct ipu_irq_node irq_list[IPU_IRQ_COUNT];
 
 	/*reg*/
-	u32 *cm_reg;
-	u32 *idmac_reg;
-	u32 *dp_reg;
-	u32 *ic_reg;
-	u32 *dc_reg;
-	u32 *dc_tmpl_reg;
-	u32 *dmfc_reg;
-	u32 *di_reg[2];
-	u32 *smfc_reg;
-	u32 *csi_reg[2];
-	u32 *cpmem_base;
-	u32 *tpmem_base;
-	u32 *disp_base[2];
-	u32 *vdi_reg;
+	void __iomem *cm_reg;
+	void __iomem *idmac_reg;
+	void __iomem *dp_reg;
+	void __iomem *ic_reg;
+	void __iomem *dc_reg;
+	void __iomem *dc_tmpl_reg;
+	void __iomem *dmfc_reg;
+	void __iomem *di_reg[2];
+	void __iomem *smfc_reg;
+	void __iomem *csi_reg[2];
+	void __iomem *cpmem_base;
+	void __iomem *tpmem_base;
+	void __iomem *disp_base[2];
+	void __iomem *vdi_reg;
 
 	struct device *dev;
 
@@ -287,7 +305,8 @@ int _ipu_disp_chan_is_interlaced(struct ipu_soc *ipu, ipu_channel_t channel);
 
 void _ipu_ic_enable_task(struct ipu_soc *ipu, ipu_channel_t channel);
 void _ipu_ic_disable_task(struct ipu_soc *ipu, ipu_channel_t channel);
-void _ipu_ic_init_prpvf(struct ipu_soc *ipu, ipu_channel_params_t *params, bool src_is_csi);
+int  _ipu_ic_init_prpvf(struct ipu_soc *ipu, ipu_channel_params_t *params,
+			bool src_is_csi);
 void _ipu_vdi_init(struct ipu_soc *ipu, ipu_channel_t channel, ipu_channel_params_t *params);
 void _ipu_vdi_uninit(struct ipu_soc *ipu);
 void _ipu_ic_uninit_prpvf(struct ipu_soc *ipu);
@@ -295,11 +314,12 @@ void _ipu_ic_init_rotate_vf(struct ipu_soc *ipu, ipu_channel_params_t *params);
 void _ipu_ic_uninit_rotate_vf(struct ipu_soc *ipu);
 void _ipu_ic_init_csi(struct ipu_soc *ipu, ipu_channel_params_t *params);
 void _ipu_ic_uninit_csi(struct ipu_soc *ipu);
-void _ipu_ic_init_prpenc(struct ipu_soc *ipu, ipu_channel_params_t *params, bool src_is_csi);
+int  _ipu_ic_init_prpenc(struct ipu_soc *ipu, ipu_channel_params_t *params,
+			 bool src_is_csi);
 void _ipu_ic_uninit_prpenc(struct ipu_soc *ipu);
 void _ipu_ic_init_rotate_enc(struct ipu_soc *ipu, ipu_channel_params_t *params);
 void _ipu_ic_uninit_rotate_enc(struct ipu_soc *ipu);
-void _ipu_ic_init_pp(struct ipu_soc *ipu, ipu_channel_params_t *params);
+int  _ipu_ic_init_pp(struct ipu_soc *ipu, ipu_channel_params_t *params);
 void _ipu_ic_uninit_pp(struct ipu_soc *ipu);
 void _ipu_ic_init_rotate_pp(struct ipu_soc *ipu, ipu_channel_params_t *params);
 void _ipu_ic_uninit_rotate_pp(struct ipu_soc *ipu);
@@ -323,4 +343,14 @@ int32_t _ipu_disp_get_window_pos(struct ipu_soc *ipu, ipu_channel_t channel,
 		int16_t *x_pos, int16_t *y_pos);
 void _ipu_get(struct ipu_soc *ipu);
 void _ipu_put(struct ipu_soc *ipu);
+
+struct clk *clk_register_mux_pix_clk(struct device *dev, const char *name,
+		const char **parent_names, u8 num_parents, unsigned long flags,
+		u8 ipu_id, u8 di_id, u8 clk_mux_flags);
+struct clk *clk_register_div_pix_clk(struct device *dev, const char *name,
+		const char *parent_name, unsigned long flags,
+		u8 ipu_id, u8 di_id, u8 clk_div_flags);
+struct clk *clk_register_gate_pix_clk(struct device *dev, const char *name,
+		const char *parent_name, unsigned long flags,
+		u8 ipu_id, u8 di_id, u8 clk_gate_flags);
 #endif				/* __INCLUDE_IPU_PRV_H__ */

@@ -1,5 +1,5 @@
 /*
- * Copyright 2008-2013 Freescale Semiconductor, Inc. All Rights Reserved.
+ * Copyright 2008-2014 Freescale Semiconductor, Inc. All Rights Reserved.
  */
 
 /*
@@ -18,14 +18,15 @@
  *
  * @ingroup IPU
  */
-#include <linux/types.h>
+#include <linux/clk.h>
+#include <linux/delay.h>
+#include <linux/errno.h>
 #include <linux/init.h>
 #include <linux/io.h>
-#include <linux/errno.h>
+#include <linux/ipu-v3.h>
+#include <linux/module.h>
 #include <linux/spinlock.h>
-#include <linux/delay.h>
-#include <linux/clk.h>
-#include <mach/ipu-v3.h>
+#include <linux/types.h>
 
 #include "ipu_prv.h"
 #include "ipu_regs.h"
@@ -235,6 +236,10 @@ EXPORT_SYMBOL(ipu_csi_get_sensor_protocol);
  */
 int ipu_csi_enable_mclk(struct ipu_soc *ipu, int csi, bool flag, bool wait)
 {
+	/* Return immediately if there is no csi_clk to manage */
+	if (ipu->csi_clk[csi] == NULL)
+		return 0;
+
 	if (flag) {
 		clk_enable(ipu->csi_clk[csi]);
 		if (wait == true)

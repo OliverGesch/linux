@@ -1,7 +1,7 @@
 /*
  * CAAM hardware register-level view
  *
- * Copyright (C) 2008-2012 Freescale Semiconductor, Inc.
+ * Copyright (C) 2008-2014 Freescale Semiconductor, Inc.
  */
 
 #ifndef REGS_H
@@ -203,12 +203,27 @@ struct jr_outentry {
 #define CHA_ID_AES_HP		(0x4ull << CHA_ID_AES_SHIFT)
 #define CHA_ID_AES_DIFFPWR	(0x1ull << CHA_ID_AES_SHIFT)
 
+
 /*
  * caam_perfmon - Performance Monitor/Secure Memory Status/
  *                CAAM Global Status/Component Version IDs
  *
  * Spans f00-fff wherever instantiated
  */
+
+/* Number of DECOs */
+#define CHA_NUM_DECONUM_SHIFT	56
+#define CHA_NUM_DECONUM_MASK	(0xfull << CHA_NUM_DECONUM_SHIFT)
+
+struct sec_vid {
+	u16 ip_id;
+	u8 maj_rev;
+	u8 min_rev;
+};
+
+#define SEC_VID_IPID_SHIFT      16
+#define SEC_VID_MAJ_SHIFT       8
+#define SEC_VID_MAJ_MASK        0xFF00
 
 struct caam_perfmon {
 	/* Performance Monitor Registers			f00-f9f */
@@ -357,8 +372,7 @@ struct rngtst {
 
 /* RNG4 TRNG test registers */
 struct rng4tst {
-#define RTMCTL_PRGM 0x00010000	/* 1 -> program mode, 0 -> run mode */
-#define RTMCTL_OSC_DIV_MASK 0xc	/* select oscillator divider value */
+#define RTMCTL_PRGM	0x00010000	/* 1 -> program mode, 0 -> run mode */
 	u32 rtmctl;		/* misc. control register */
 	u32 rtscmisc;		/* statistical check misc. register */
 	u32 rtpkrrng;		/* poker range register */
@@ -368,6 +382,8 @@ struct rng4tst {
 	};
 #define RTSDCTL_ENT_DLY_SHIFT 16
 #define RTSDCTL_ENT_DLY_MASK (0xffff << RTSDCTL_ENT_DLY_SHIFT)
+#define RTSDCTL_ENT_DLY_MIN 3200
+#define RTSDCTL_ENT_DLY_MAX 12800
 	u32 rtsdctl;		/* seed control register */
 	union {
 		u32 rtsblim;	/* PRGM=1: sparse bit limit register */
@@ -378,7 +394,16 @@ struct rng4tst {
 		u32 rtfrqmax;	/* PRGM=1: freq. count max. limit register */
 		u32 rtfrqcnt;	/* PRGM=0: freq. count register */
 	};
-	u32 rsvd1[56];
+	u32 rsvd1[40];
+#define RDSTA_SKVN 0x40000000 /* Secure Key Valid Non-Test mode */
+#define RDSTA_SKVT 0x80000000 /* Secure Key Valid Test. non-test mode */
+#define RDSTA_IF0 0x00000001
+#define RDSTA_IF1 0x00000002
+#define RDSTA_IF 0x00000003 /* state handle instantiated flags 0 and 1 */
+#define RDSTA_IFMASK (RDSTA_IF1 | RDSTA_IF0)
+#define RDSTA_TF   0x00000300 /* State handle instantiated Test-mode */
+	u32 rdsta;              /* DRNG status register */
+	u32 rsvd2[15];
 };
 
 /*
@@ -402,7 +427,8 @@ struct caam_ctrl {
 	/* Read/Writable					        */
 	u32 rsvd1;
 	u32 mcr;		/* MCFG      Master Config Register  */
-	u32 rsvd2[2];
+	u32 rsvd2;
+	u32 scfgr;		/* SCFGR, Security Config Register */
 
 	/* Bus Access Configuration Section			010-11f */
 	/* Read/Writable                                                */
@@ -449,6 +475,9 @@ struct caam_ctrl {
 #define MCFGR_WDFAIL		0x20000000 /* DECO watchdog force-fail */
 #define MCFGR_DMA_RESET		0x10000000
 #define MCFGR_LONG_PTR		0x00010000 /* Use >32-bit desc addressing */
+#define SCFGR_RDBENABLE		0x00000400
+#define DECORR_RQD0ENABLE	0x00000001 /* Enable DECO0 for direct access */
+#define DECORR_DEN0		0x00010000 /* DECO0 available for access*/
 
 /* AXI read cache control */
 #define MCFGR_ARCACHE_SHIFT	12
@@ -865,6 +894,7 @@ struct caam_deco {
 	u32 jr_ctl_hi;	/* CxJRR - JobR Control Register      @800 */
 	u32 jr_ctl_lo;
 	u64 jr_descaddr;	/* CxDADR - JobR Descriptor Address */
+#define DECO_OP_STATUS_HI_ERR_MASK 0xF00000FF
 	u32 op_status_hi;	/* DxOPSTA - DECO Operation Status */
 	u32 op_status_lo;
 	u32 rsvd24[2];
@@ -878,8 +908,16 @@ struct caam_deco {
 	struct deco_sg_table sctr_tbl[4];	/* DxSTR - Scatter Tables */
 	u32 rsvd29[48];
 	u32 descbuf[64];	/* DxDESB - Descriptor buffer */
-	u32 rsvd30[320];
+	u32 rscvd30[193];
+#define DESC_DBG_DECO_STAT_HOST_ERR	0x00D00000
+#define DESC_DBG_DECO_STAT_VALID	0x80000000
+#define DESC_DBG_DECO_STAT_MASK		0x00F00000
+	u32 desc_dbg;		/* DxDDR - DECO Debug Register */
+	u32 rsvd31[126];
 };
+
+#define DECO_JQCR_WHL		0x20000000
+#define DECO_JQCR_FOUR		0x10000000
 
 /*
  * Current top-level view of memory map is:
@@ -908,6 +946,7 @@ struct caam_full {
 	u64 rsvd[512];
 	struct caam_assurance assure;
 	struct caam_queue_if qi;
+	struct caam_deco deco;
 };
 
 #endif /* REGS_H */

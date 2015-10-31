@@ -2,18 +2,12 @@
  * CAAM/SEC 4.x driver backend
  * Private/internal definitions between modules
  *
- * Copyright (C) 2008-2012 Freescale Semiconductor, Inc.
+ * Copyright (C) 2008-2014 Freescale Semiconductor, Inc.
  *
  */
 
 #ifndef INTERN_H
 #define INTERN_H
-
-#define JOBR_UNASSIGNED 0
-#define JOBR_ASSIGNED 1
-
-/* Default clock/sample settings for an RNG4 entropy source */
-#define RNG4_ENT_CLOCKS_SAMPLE 1600
 
 /* Currently comes from Kconfig param as a ^2 (driver-required) */
 #define JOBR_DEPTH (1 << CONFIG_CRYPTO_DEV_FSL_CAAM_RINGSIZE)
@@ -29,23 +23,6 @@
 #define JOBR_INTC_COUNT_THLD 0
 #endif
 
-#ifndef CONFIG_OF
-#define JR_IRQRES_NAME_ROOT "irq_jr"
-#define JR_MEMRES_NAME_ROOT "offset_jr"
-#endif
-
-#ifdef CONFIG_ARM
-/*
- * FIXME: ARM tree doesn't seem to provide this, ergo it seems to be
- * in "platform limbo". Find a better place, perhaps.
- */
-static inline void irq_dispose_mapping(unsigned int virq)
-{
-	return;
-}
-#endif
-
-
 /*
  * Storage for tracking each in-process entry moving across a ring
  * Each entry on an output ring needs one of these
@@ -60,12 +37,15 @@ struct caam_jrentry_info {
 
 /* Private sub-storage for a single JobR */
 struct caam_drv_private_jr {
-	struct device *parentdev;	/* points back to controller dev */
+	struct list_head	list_node;	/* Job Ring device list */
+	struct device		*dev;
 	int ridx;
 	struct caam_job_ring __iomem *rregs;	/* JobR's register space */
-	struct tasklet_struct irqtask[NR_CPUS];
+	struct tasklet_struct irqtask;
 	int irq;			/* One per queue */
-	int assign;			/* busy/free */
+
+	/* Number of scatterlist crypt transforms active on the JobR */
+	atomic_t tfm_count ____cacheline_aligned;
 
 	/* Job ring info */
 	int ringsize;	/* Size of rings (assume input = output) */
@@ -86,8 +66,8 @@ struct caam_drv_private_jr {
 struct caam_drv_private {
 
 	struct device *dev;
-	struct device **jrdev; /* Alloc'ed array per sub-device */
-	spinlock_t jr_alloc_lock;
+	struct device *smdev;
+	struct platform_device **jrpdev; /* Alloc'ed array per sub-device */
 	struct platform_device *pdev;
 
 	/* Physical-presence section */
@@ -95,7 +75,6 @@ struct caam_drv_private {
 	struct caam_deco **deco; /* DECO/CCB views */
 	struct caam_assurance *ac;
 	struct caam_queue_if *qi; /* QI control region */
-	struct snvs_full __iomem *snvs;	/* SNVS HP+LP register space */
 	dma_addr_t __iomem *sm_base;	/* Secure memory storage base */
 	u32 sm_size;
 
@@ -105,29 +84,19 @@ struct caam_drv_private {
 	 */
 	u8 total_jobrs;		/* Total Job Rings in device */
 	u8 qi_present;		/* Nonzero if QI present in device */
-	int secvio_irq;		/* Security violation interrupt number */
-	int rng_inst;		/* Total instantiated RNGs */
-
-	/* which jr allocated to scatterlist crypto */
-	atomic_t tfm_count ____cacheline_aligned;
-	int num_jrs_for_algapi;
-	struct device **algapi_jr;
-	/* list of registered crypto algorithms (mk generic context handle?) */
-	struct list_head alg_list;
-	/* list of registered hash algorithms (mk generic context handle?) */
-	struct list_head hash_list;
 
 #ifdef CONFIG_ARM
-	struct clk *caam_clk;
+	struct clk *caam_ipg;
+	struct clk *caam_mem;
+	struct clk *caam_aclk;
+	struct clk *caam_emi_slow;
 #endif
 
-#ifdef CONFIG_CRYPTO_DEV_FSL_CAAM_SM
-	struct device *smdev;	/* Secure Memory dev */
-#endif
-
-#ifdef CONFIG_CRYPTO_DEV_FSL_CAAM_SECVIO
-	struct device *secviodev;
-#endif
+#define	RNG4_MAX_HANDLES 2
+	/* RNG4 block */
+	u32 rng4_sh_init;	/* This bitmap shows which of the State
+				   Handles of the RNG4 block are initialized
+				   by this driver */
 
 	/*
 	 * debugfs entries for developer view into driver/device
@@ -146,43 +115,6 @@ struct caam_drv_private {
 #endif
 };
 
-/*
- * These startup/shutdown functions exist to enable API startup/shutdown
- * outside of the OF device detection framework. It's necessary for ARM
- * kernels as presently delivered.
- *
- * Once ARM kernels are shipping with OF support, these functions can
- * be re-integrated into the normal probe startup/exit functions,
- * and these prototypes can then be removed.
- */
-#ifndef CONFIG_OF
-void caam_algapi_shutdown(struct platform_device *pdev);
-int caam_algapi_startup(struct platform_device *pdev);
-
-#ifdef CONFIG_CRYPTO_DEV_FSL_CAAM_AHASH_API
-int caam_algapi_hash_startup(struct platform_device *pdev);
-void caam_algapi_hash_shutdown(struct platform_device *pdev);
-#endif
-
-#ifdef CONFIG_CRYPTO_DEV_FSL_CAAM_RNG_API
-int caam_rng_startup(struct platform_device *pdev);
-void caam_rng_shutdown(void);
-#endif
-
-#ifdef CONFIG_CRYPTO_DEV_FSL_CAAM_SM
-int caam_sm_startup(struct platform_device *pdev);
-void caam_sm_shutdown(struct platform_device *pdev);
-#endif
-
-#ifdef CONFIG_CRYPTO_DEV_FSL_CAAM_SM_TEST
-int caam_sm_example_init(struct platform_device *pdev);
-#endif
-
-#ifdef CONFIG_CRYPTO_DEV_FSL_CAAM_SECVIO
-int caam_secvio_startup(struct platform_device *pdev);
-void caam_secvio_shutdown(struct platform_device *pdev);
-#endif /* SECVIO */
-
-#endif /* CONFIG_OF */
-
+void caam_jr_algapi_init(struct device *dev);
+void caam_jr_algapi_remove(struct device *dev);
 #endif /* INTERN_H */

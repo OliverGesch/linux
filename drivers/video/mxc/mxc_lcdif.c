@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011 Freescale Semiconductor, Inc. All Rights Reserved.
+ * Copyright (C) 2011-2014 Freescale Semiconductor, Inc. All Rights Reserved.
  */
 
 /*
@@ -11,13 +11,22 @@
  * http://www.gnu.org/copyleft/gpl.html
  */
 
+#include <linux/init.h>
+#include <linux/ipu.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
-#include <linux/init.h>
-#include <linux/platform_device.h>
 #include <linux/mxcfb.h>
-#include <linux/fsl_devices.h>
+#include <linux/of_device.h>
+#include <linux/pinctrl/consumer.h>
+#include <linux/platform_device.h>
+
 #include "mxc_dispdrv.h"
+
+struct mxc_lcd_platform_data {
+	u32 default_ifmt;
+	u32 ipu_id;
+	u32 disp_id;
+};
 
 struct mxc_lcdif_data {
 	struct platform_device *pdev;
@@ -27,18 +36,6 @@ struct mxc_lcdif_data {
 #define DISPDRV_LCD	"lcd"
 
 static struct fb_videomode lcdif_modedb[] = {
-	{
-	/* 800x480 @ 60 Hz , pixel clk @ 32MHz */
-	"LCD-USER1", 60, 800, 480, 29850, 89, 164, 23, 10, 10, 10,
-	FB_SYNC_CLK_LAT_FALL,
-	FB_VMODE_NONINTERLACED,
-	0,},
-	{
-	/* 800x480 @ 60 Hz , pixel clk @ 32MHz */
-	"LCD-USER2", 60, 800, 480, 29850, 89, 164, 23, 10, 10, 10,
-	FB_SYNC_CLK_LAT_FALL,
-	FB_VMODE_NONINTERLACED,
-	0,},
 	{
 	/* 800x480 @ 57 Hz , pixel clk @ 27MHz */
 	"CLAA-WVGA", 57, 800, 480, 37037, 40, 60, 10, 10, 20, 10,
@@ -59,59 +56,16 @@ static int lcdif_init(struct mxc_dispdrv_handle *disp,
 {
 	int ret, i;
 	struct mxc_lcdif_data *lcdif = mxc_dispdrv_getdata(disp);
-	struct fsl_mxc_lcd_platform_data *plat_data
-			= lcdif->pdev->dev.platform_data;
+	struct device *dev = &lcdif->pdev->dev;
+	struct mxc_lcd_platform_data *plat_data = dev->platform_data;
 	struct fb_videomode *modedb = lcdif_modedb;
 	int modedb_sz = lcdif_modedb_sz;
-	struct fsl_video_timing *custom_timing;
 
 	/* use platform defined ipu/di */
-	setting->dev_id = plat_data->ipu_id;
-	setting->disp_id = plat_data->disp_id;
-
-	if (plat_data->lcd0_timing != NULL) {
-		custom_timing = plat_data->lcd0_timing;
-		lcdif_modedb[0].pixclock =
-			PICOS2KHZ(custom_timing->pixclock);
-		lcdif_modedb[0].xres =
-			custom_timing->hres;
-		lcdif_modedb[0].left_margin = 
-			custom_timing->hfp;
-		lcdif_modedb[0].right_margin =
-			custom_timing->hbp;
-		lcdif_modedb[0].hsync_len =
-			custom_timing->hsw;
-		lcdif_modedb[0].yres =
-			custom_timing->vres;
-		lcdif_modedb[0].upper_margin =
-			custom_timing->vfp;
-		lcdif_modedb[0].lower_margin =
-			custom_timing->vbp;
-		lcdif_modedb[0].vsync_len =
-			custom_timing->vsw;
-	}
-
-	if (plat_data->lcd1_timing != NULL) {
-		custom_timing = plat_data->lcd1_timing;
-		lcdif_modedb[1].pixclock =
-		        PICOS2KHZ(custom_timing->pixclock);
-		lcdif_modedb[1].xres =
-		        custom_timing->hres;
-		lcdif_modedb[1].left_margin =
-		        custom_timing->hfp;
-		lcdif_modedb[1].right_margin =
-		        custom_timing->hbp;
-		lcdif_modedb[1].hsync_len =
-		        custom_timing->hsw;
-		lcdif_modedb[1].yres =
-		        custom_timing->vres;
-		lcdif_modedb[1].upper_margin =
-		        custom_timing->vfp;
-		lcdif_modedb[1].lower_margin =
-		        custom_timing->vbp;
-		lcdif_modedb[1].vsync_len =
-		        custom_timing->vsw;
-	}
+	ret = ipu_di_to_crtc(dev, plat_data->ipu_id,
+			     plat_data->disp_id, &setting->crtc);
+	if (ret < 0)
+		return ret;
 
 	ret = fb_find_mode(&setting->fbi->var, setting->fbi, setting->dft_mode_str,
 				modedb, modedb_sz, NULL, setting->default_bpp);
@@ -145,15 +99,91 @@ static struct mxc_dispdrv_driver lcdif_drv = {
 	.deinit	= lcdif_deinit,
 };
 
+static int lcd_get_of_property(struct platform_device *pdev,
+				struct mxc_lcd_platform_data *plat_data)
+{
+	struct device_node *np = pdev->dev.of_node;
+	int err;
+	u32 ipu_id, disp_id;
+	const char *default_ifmt;
+
+	err = of_property_read_string(np, "default_ifmt", &default_ifmt);
+	if (err) {
+		dev_dbg(&pdev->dev, "get of property default_ifmt fail\n");
+		return err;
+	}
+	err = of_property_read_u32(np, "ipu_id", &ipu_id);
+	if (err) {
+		dev_dbg(&pdev->dev, "get of property ipu_id fail\n");
+		return err;
+	}
+	err = of_property_read_u32(np, "disp_id", &disp_id);
+	if (err) {
+		dev_dbg(&pdev->dev, "get of property disp_id fail\n");
+		return err;
+	}
+
+	plat_data->ipu_id = ipu_id;
+	plat_data->disp_id = disp_id;
+	if (!strncmp(default_ifmt, "RGB24", 5))
+		plat_data->default_ifmt = IPU_PIX_FMT_RGB24;
+	else if (!strncmp(default_ifmt, "BGR24", 5))
+		plat_data->default_ifmt = IPU_PIX_FMT_BGR24;
+	else if (!strncmp(default_ifmt, "GBR24", 5))
+		plat_data->default_ifmt = IPU_PIX_FMT_GBR24;
+	else if (!strncmp(default_ifmt, "RGB565", 6))
+		plat_data->default_ifmt = IPU_PIX_FMT_RGB565;
+	else if (!strncmp(default_ifmt, "RGB666", 6))
+		plat_data->default_ifmt = IPU_PIX_FMT_RGB666;
+	else if (!strncmp(default_ifmt, "YUV444", 6))
+		plat_data->default_ifmt = IPU_PIX_FMT_YUV444;
+	else if (!strncmp(default_ifmt, "LVDS666", 7))
+		plat_data->default_ifmt = IPU_PIX_FMT_LVDS666;
+	else if (!strncmp(default_ifmt, "YUYV16", 6))
+		plat_data->default_ifmt = IPU_PIX_FMT_YUYV;
+	else if (!strncmp(default_ifmt, "UYVY16", 6))
+		plat_data->default_ifmt = IPU_PIX_FMT_UYVY;
+	else if (!strncmp(default_ifmt, "YVYU16", 6))
+		plat_data->default_ifmt = IPU_PIX_FMT_YVYU;
+	else if (!strncmp(default_ifmt, "VYUY16", 6))
+				plat_data->default_ifmt = IPU_PIX_FMT_VYUY;
+	else {
+		dev_err(&pdev->dev, "err default_ifmt!\n");
+		return -ENOENT;
+	}
+
+	return err;
+}
+
 static int mxc_lcdif_probe(struct platform_device *pdev)
 {
-	int ret = 0;
+	int ret;
+	struct pinctrl *pinctrl;
 	struct mxc_lcdif_data *lcdif;
+	struct mxc_lcd_platform_data *plat_data;
 
-	lcdif = kzalloc(sizeof(struct mxc_lcdif_data), GFP_KERNEL);
-	if (!lcdif) {
-		ret = -ENOMEM;
-		goto alloc_failed;
+	dev_dbg(&pdev->dev, "%s enter\n", __func__);
+	lcdif = devm_kzalloc(&pdev->dev, sizeof(struct mxc_lcdif_data),
+				GFP_KERNEL);
+	if (!lcdif)
+		return -ENOMEM;
+	plat_data = devm_kzalloc(&pdev->dev,
+				sizeof(struct mxc_lcd_platform_data),
+				GFP_KERNEL);
+	if (!plat_data)
+		return -ENOMEM;
+	pdev->dev.platform_data = plat_data;
+
+	ret = lcd_get_of_property(pdev, plat_data);
+	if (ret < 0) {
+		dev_err(&pdev->dev, "get lcd of property fail\n");
+		return ret;
+	}
+
+	pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
+	if (IS_ERR(pinctrl)) {
+		dev_err(&pdev->dev, "can't get/select pinctrl\n");
+		return PTR_ERR(pinctrl);
 	}
 
 	lcdif->pdev = pdev;
@@ -161,8 +191,8 @@ static int mxc_lcdif_probe(struct platform_device *pdev)
 	mxc_dispdrv_setdata(lcdif->disp_lcdif, lcdif);
 
 	dev_set_drvdata(&pdev->dev, lcdif);
+	dev_dbg(&pdev->dev, "%s exit\n", __func__);
 
-alloc_failed:
 	return ret;
 }
 
@@ -176,10 +206,15 @@ static int mxc_lcdif_remove(struct platform_device *pdev)
 	return 0;
 }
 
+static const struct of_device_id imx_lcd_dt_ids[] = {
+	{ .compatible = "fsl,lcd"},
+	{ /* sentinel */ }
+};
 static struct platform_driver mxc_lcdif_driver = {
 	.driver = {
-		   .name = "mxc_lcdif",
-		   },
+		.name = "mxc_lcdif",
+		.of_match_table	= imx_lcd_dt_ids,
+	},
 	.probe = mxc_lcdif_probe,
 	.remove = mxc_lcdif_remove,
 };
