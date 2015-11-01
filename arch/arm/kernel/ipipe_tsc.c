@@ -132,6 +132,10 @@ void __ipipe_tsc_register(struct __ipipe_tscinfo *info)
 			   (unsigned long)(tsc_area + 0x80));
 	hard_local_irq_restore(flags);
 
+#ifdef CONFIG_CPU_FREQ_GOV_PERFORMANCE
+   if (registered)
+       tsc_info.freq = 498000000;
+#endif	
 	printk(KERN_INFO "I-pipe, %u.%03u MHz clocksource\n",
 	       tsc_info.freq / 1000000, (tsc_info.freq % 1000000) / 1000);
 	if (!registered)
