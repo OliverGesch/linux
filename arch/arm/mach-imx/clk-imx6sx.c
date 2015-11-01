@@ -197,6 +197,7 @@ __setup("uart_from_osc", setup_uart_clk);
 static void __init imx6sx_clocks_init(struct device_node *ccm_node)
 {
 	struct device_node *np;
+	struct resource res;
 	void __iomem *base;
 	int i, irq;
 
