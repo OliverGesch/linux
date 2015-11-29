@@ -61,6 +61,20 @@
 		};
 	};
 
+
+    gpio-edm {
+        compatible = "gpio-edm";
+
+        gpio_p2_28 {
+            label = "WB_CHECK";
+            gpios = <&gpio2 28 1>;
+            dir   = "in";
+        };
+
+    };
+
+
+
 	sound {
 		compatible = "fsl,imx6-wandboard-sgtl5000", 
                              "fsl,imx-audio-sgtl5000";
@@ -130,7 +144,8 @@
                 compatible = "fsl,mxc_sdc_fb";
                 disp_dev = "ldb";
                 interface_pix_fmt = "RGB666";
-                default_bpp = <24>;
+                mode_str ="LDB-XGA";
+                default_bpp = <16>;
                 int_clk = <0>;
                 late_init = <0>;
                 status = "disabled";
@@ -177,7 +192,7 @@
 
 	backlight_lvds {
 		compatible = "pwm-backlight";
-		pwms = <&pwm3 0 5000000>;
+		pwms = <&pwm4 0 5000000>;
 		brightness-levels = <0 4 8 16 32 64 128 255>;
 		default-brightness-level = <7>;
 	};
@@ -397,30 +412,18 @@ reference manual.
 	};
 };
 
-&ldb {
-	status = "okay";
-	lvds-channel@0 {
-		fsl,data-mapping = "spwg";
-		fsl,data-width = <24>;
-		primary;
-		status = "okay";
 
-		display-timings {
-			native-mode = <&timing0>;
-			timing0: hj070na {
-				clock-frequency = <51000000>;
-				hactive = <1024>;
-				vactive = <600>;
-				hback-porch = <90>;
-				hfront-porch = <120>;
-				vback-porch = <1>;
-				vfront-porch = <1>;
-				hsync-len = <100>;
-				vsync-len = <33>;
-			};
-		};
-	};
+#if 0
+&ldb {
+	ipu_id = <0>;
+	disp_id = <1>;
+	ext_ref = <1>;
+	mode = "sin0";
+	sec_ipu_id = <1>;
+	sec_disp_id = <1>;
+	status = "okay";
 };
+#endif
 
 &mipi_csi {
 	ipu_id = <0>;
@@ -434,7 +437,7 @@ reference manual.
 	status = "okay";
 };
 
-
+#if 0
 &pwm1 {
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_pwm1_1>;
@@ -443,11 +446,10 @@ reference manual.
 
 &pwm3 {
 	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_pwm3_1>;
+	pinctrl-0 = <&pinctrl_pwm3_2>;
 	status = "okay";
 };
 
-#if 0
 &pwm4 {
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_pwm4_2>;

@@ -1,7 +1,7 @@
 /*
- * Copyright 2015 Technexion Ltd.
+ * Copyright 2013 Freescale Semiconductor, Inc.
  *
- * Author: Richard Hu <richard.hu@technexion.com>
+ * Author: Fabio Estevam <fabio.estevam@freescale.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -15,8 +15,8 @@
 #include "imx6qdl-edm1-cf.dtsi"
 
 / {
-	model = "Technexion EDM1-CF-IMX6 DualLite/Solo board";
-	compatible = "fsl,edm1-cf-imx6dl", "fsl,imx6dl";
+	model = "Wandboard i.MX6 Dual Lite Board";
+	compatible = "wand,imx6dl-wandboard", "fsl,imx6dl";
 };
 
 &ldb {

@@ -1,5 +1,6 @@
 /*
- * Copyright 2015 Technexion Ltd.
+ * Copyright 2014 John Weber, Avnet Electronics Marketing
+ * Copyright 2013 Boundary Devices
  * Copyright 2012 Freescale Semiconductor, Inc.
  * Copyright 2011 Linaro Ltd.
  *
@@ -58,15 +59,8 @@
 			gpio = <&gpio3 22 0>;
 			enable-active-high;
 		};
-
-		reg_3v3on: regulator@0 {
-			compatible = "regulator-fixed";
-			regulator-name = "3V3ON";
-			regulator-min-microvolt = <3300000>;
-			regulator-max-microvolt = <3300000>;
-			regulator-always-on;
-		};
 	};
+
 
     gpio-edm {
         compatible = "gpio-edm";
@@ -140,20 +134,6 @@
 		hdmi-controller = <&hdmi_audio>;
 	};
 
-	rfkill {
-		compatible = "bcm,bcm43xx_rfkill";
-		pinctrl-names = "default";
-		pinctrl-0 = <&pinctrl_bt_ctrl &pinctrl_wifi_ctrl>;
-		bluetooth-on = <&gpio5 21 0>;
-		bluetooth-reg-on = <&gpio5 30 0>;
-		bluetooth-wake = <&gpio1 30 0>;
-		bluetooth-host-wake = <&gpio5 20 0>;
-
-		wifi-ref-on = <&gpio5 31 0>;
-		wifi-rst-n = <&gpio6 0 0>;
-		wifi-reg-on = <&gpio1 26 0>;
-		wifi-host-wake = <&gpio1 29 0>;
-	};
 
 	mxcfb1: fb@0 {
 		compatible = "fsl,mxc_sdc_fb";
@@ -337,15 +317,15 @@
 		compatible = "fsl,mag3110";
 		reg = <0x0e>;
 		position = <2>;
-		vdd-supply = <&reg_3v3on>;
-		vddio-supply = <&reg_3v3on>;
+		vdd-supply = <&reg_3p3v>;
+		vddio-supply = <&reg_3p3v>;
 	};
 
 	lis331dlh: lis331dlh@18 {
 		compatible = "st,lis331dlh", "st,lis3lv02d";
 		reg = <0x18>;
-		Vdd-supply = <&reg_3v3on>;
-		Vdd_IO-supply = <&reg_3v3on>;
+		Vdd-supply = <&reg_3p3v>;
+		Vdd_IO-supply = <&reg_3p3v>;
 
 		st,click-single-x;
 		st,click-single-y;
@@ -369,11 +349,11 @@
 		st,max-limit-z = <750>;
 	};
 
-	isl29023@44 {
+	/*isl29023@44 {
 		compatible = "fsl,isl29023";
 		reg = <0x44>;
 		rext = <499>;
-	};
+	};*/
 
 	ds1337: rtc@68 {
 		compatible = "mxim,ds1337";
@@ -430,7 +410,7 @@ reference manual.
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_hog_1>;
 
-	imx6qdl-edm1-cf {
+	imx6qdl-wandboard {
 		pinctrl_hog_1: hoggrp-1 {
 			fsl,pins = <
 				MX6QDL_PAD_GPIO_0__CCM_CLKO1     	0x130b0
@@ -678,7 +658,7 @@ reference manual.
 		interrupts = <5 0>;
 		spi-max-frequency = <1000000>;
 		pendown-gpio = <&gpio4 5 0>; /* GPIO_19 */
-		vcc-supply = <&reg_3v3on>;
+		vcc-supply = <&reg_3p3v>;
 
 		ti,x-min = /bits/ 16 <0>;
 		ti,x-max = /bits/ 16 <4095>;

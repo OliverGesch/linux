@@ -472,6 +472,8 @@ struct mmc_host *mmc_alloc_host(int extra, struct device *dev)
 
 	spin_lock_init(&host->lock);
 	init_waitqueue_head(&host->wq);
+	wake_lock_init(&host->detect_wake_lock, WAKE_LOCK_SUSPEND,
+		kasprintf(GFP_KERNEL, "%s_detect", mmc_hostname(host)));
 	INIT_DELAYED_WORK(&host->detect, mmc_rescan);
 #ifdef CONFIG_PM
 	host->pm_notify.notifier_call = mmc_pm_notify;
@@ -505,6 +507,7 @@ EXPORT_SYMBOL(mmc_alloc_host);
  *	prepared to start servicing requests before this function
  *	completes.
  */
+static struct mmc_host *rescan_sdio_host;
 int mmc_add_host(struct mmc_host *host)
 {
 	int err;
@@ -524,7 +527,11 @@ int mmc_add_host(struct mmc_host *host)
 	mmc_host_clk_sysfs_init(host);
 
 	mmc_start_host(host);
-	register_pm_notifier(&host->pm_notify);
+	if (!(host->pm_flags & MMC_PM_IGNORE_PM_NOTIFY))
+		register_pm_notifier(&host->pm_notify);
+
+	if (host->caps2 & MMC_CAP2_SDIO_FORCE_RESCAN)
+		rescan_sdio_host = host;
 
 	return 0;
 }
@@ -541,7 +548,9 @@ EXPORT_SYMBOL(mmc_add_host);
  */
 void mmc_remove_host(struct mmc_host *host)
 {
-	unregister_pm_notifier(&host->pm_notify);
+	if (!(host->pm_flags & MMC_PM_IGNORE_PM_NOTIFY))
+		unregister_pm_notifier(&host->pm_notify);
+
 	mmc_stop_host(host);
 
 #ifdef CONFIG_DEBUG_FS
@@ -568,8 +577,53 @@ void mmc_free_host(struct mmc_host *host)
 	spin_lock(&mmc_host_lock);
 	idr_remove(&mmc_host_idr, host->index);
 	spin_unlock(&mmc_host_lock);
+	wake_lock_destroy(&host->detect_wake_lock);
 
 	put_device(&host->class_dev);
 }
 
 EXPORT_SYMBOL(mmc_free_host);
+
+/**
+ *	mmc_host_rescan - triger software rescan flow
+ *	@host: mmc host
+ *
+ *	rescan slot attach in the assigned host.
+ *	If @host is NULL, default rescan rescan_sdio_host
+ *  saved by mmc_add_host().
+ *  OR, rescan host from argument.
+ *
+ */
+int mmc_host_rescan(struct mmc_host *host, int val, int is_cap_sdio_irq)
+{
+	if (NULL != rescan_sdio_host) {
+		if(!host)
+			host = rescan_sdio_host;
+		else
+			printk("%s: mmc_host_rescan pass in host from argument!\n", mmc_hostname(host));
+	} else {
+		printk("sdio: host isn't  initialization successfully.\n");
+		return -ENOMEDIUM;
+	}
+
+	printk("%s:mmc host rescan start!\n", mmc_hostname(host));
+
+	/*  0: oob  1:cap-sdio-irq */
+	if (is_cap_sdio_irq == 1) {
+		host->caps |= MMC_CAP_SDIO_IRQ;
+	} else if (is_cap_sdio_irq == 0) {
+		host->caps &= ~MMC_CAP_SDIO_IRQ;
+	} else {
+		dev_err(&host->class_dev, "sdio: host doesn't identify oob or sdio_irq mode!\n");
+		return -ENOMEDIUM;
+	}
+
+	if (host->caps & MMC_CAP_NONREMOVABLE) {
+		host->caps &= ~MMC_CAP_NONREMOVABLE;
+	}
+
+	mmc_detect_change(host, msecs_to_jiffies(200));
+
+	return 0;
+}
+EXPORT_SYMBOL(mmc_host_rescan);

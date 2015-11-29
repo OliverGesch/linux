@@ -1,7 +1,7 @@
 /*
  * Copyright (C) 1999 ARM Limited
  * Copyright (C) 2000 Deep Blue Solutions Ltd
- * Copyright (C) 2006-2014 Freescale Semiconductor, Inc. All Rights Reserved.
+ * Copyright (C) 2006-2015 Freescale Semiconductor, Inc. All Rights Reserved.
  * Copyright 2008 Juergen Beisert, kernel@pengutronix.de
  * Copyright 2009 Ilya Yanok, Emcraft Systems Ltd, yanok@emcraft.com
  *
@@ -31,17 +31,77 @@
 
 #include "common.h"
 #include "hardware.h"
+#include "mx6.h"
 
 static void __iomem *wdog_base;
 static struct clk *wdog_clk;
 static u32 wdog_source = 1; /* use WDOG1 default */
 
+#ifdef CONFIG_MXC_REBOOT_ANDROID_CMD
+/* This function will set a bit on SNVS_LPGPR[7-8] bits to enter
+ * special boot mode.  These bits will not clear by watchdog reset, so
+ * it can be checked by bootloader to choose enter different mode.*/
+
+#define ANDROID_RECOVERY_BOOT  (1 << 7)
+#define ANDROID_FASTBOOT_BOOT  (1 << 8)
+
+#define AIPS1_ARB_BASE_ADDR		0x02000000
+#define ATZ1_BASE_ADDR			AIPS1_ARB_BASE_ADDR
+#define AIPS1_OFF_BASE_ADDR		(ATZ1_BASE_ADDR + 0x80000)
+#define MX6_SNVS_BASE_ADDR		(AIPS1_OFF_BASE_ADDR + 0x4C000)
+#define SNVS_LPGPR				0x68
+#define SNVS_SIZE				(1024*16)
+void do_switch_recovery(void)
+{
+	u32 reg;
+	u32 addr;
+	addr = ioremap(MX6_SNVS_BASE_ADDR, SNVS_SIZE);
+	if (!addr) {
+		pr_warn("SNVS ioremap failed!\n");
+		return;
+	}
+	reg = __raw_readl(addr + SNVS_LPGPR);
+	reg |= ANDROID_RECOVERY_BOOT;
+	__raw_writel(reg, (addr + SNVS_LPGPR));
+
+	iounmap(addr);
+}
+
+void do_switch_fastboot(void)
+{
+	u32 reg;
+	u32 addr;
+
+	addr = ioremap(MX6_SNVS_BASE_ADDR, SNVS_SIZE);
+	if (!addr) {
+		pr_warn("SNVS ioremap failed!\n");
+		return;
+	}
+
+	reg = __raw_readl(addr + SNVS_LPGPR);
+	reg |= ANDROID_FASTBOOT_BOOT;
+	__raw_writel(reg, addr + SNVS_LPGPR);
+
+	iounmap(addr);
+}
+#endif
+static void arch_reset_special_mode(char mode, const char *cmd)
+{
+#ifdef CONFIG_MXC_REBOOT_ANDROID_CMD
+	if (cmd && strcmp(cmd, "recovery") == 0)
+		do_switch_recovery();
+	else if (cmd && strcmp(cmd, "bootloader") == 0)
+		do_switch_fastboot();
+#endif
+}
 /*
  * Reset the system. It is called by machine_restart().
  */
 void mxc_restart(char mode, const char *cmd)
 {
 	unsigned int wcr_enable;
+
+	arch_reset_special_mode(mode, cmd);
 
 	if (wdog_clk)
 		clk_enable(wdog_clk);
@@ -133,7 +193,7 @@ void __init imx_init_l2cache(void)
 {
 	void __iomem *l2x0_base;
 	struct device_node *np;
-	unsigned int val;
+	unsigned int val, cache_id;
 
 	np = of_find_compatible_node(NULL, NULL, "arm,pl310-cache");
 	if (!np)
@@ -146,19 +206,23 @@ void __init imx_init_l2cache(void)
 	}
 
 	/* Configure the L2 PREFETCH and POWER registers */
+	/* Set prefetch offset with any value except 23 as per errata 765569 */
 	val = readl_relaxed(l2x0_base + L2X0_PREFETCH_CTRL);
-	val |= 0x30000000;
+	val |= 0x7000000f;
 	/*
 	 * The L2 cache controller(PL310) version on the i.MX6D/Q is r3p1-50rel0
-	 * The L2 cache controller(PL310) version on the i.MX6DL/SOLO/SL is r3p2
+	 * The L2 cache controller(PL310) version on the i.MX6DL/SOLO/SL/SX/DQP
+	 * is r3p2.
 	 * But according to ARM PL310 errata: 752271
 	 * ID: 752271: Double linefill feature can cause data corruption
 	 * Fault Status: Present in: r3p0, r3p1, r3p1-50rel0. Fixed in r3p2
 	 * Workaround: The only workaround to this erratum is to disable the
 	 * double linefill feature. This is the default behavior.
 	 */
-	if (!of_machine_is_compatible("fsl,imx6q"))
-		val |= 0x40800000;
+	cache_id = readl_relaxed(l2x0_base + L2X0_CACHE_ID);
+	if (((cache_id & L2X0_CACHE_ID_PART_MASK) == L2X0_CACHE_ID_PART_L310)
+	    && ((cache_id & L2X0_CACHE_ID_RTL_MASK) < L2X0_CACHE_ID_RTL_R3P2))
+		val &= ~(1 << 30);
 	writel_relaxed(val, l2x0_base + L2X0_PREFETCH_CTRL);
 	val = L2X0_DYNAMIC_CLK_GATING_EN | L2X0_STNDBY_MODE_EN;
 	writel_relaxed(val, l2x0_base + L2X0_POWER_CTRL);

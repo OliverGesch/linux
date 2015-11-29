@@ -60,6 +60,11 @@
 		};
 	};
 
+
+    gpio-edm {
+        compatible = "gpio-edm";
+    };
+
 	sound {
 		compatible = "fsl,picosom-imx6-sgtl5000",
                              "fsl,imx-audio-sgtl5000";
@@ -95,14 +100,14 @@
 		wl-host-wake = <&gpio7 11 0>;
 	};
 
-	rfkill {
+	/*rfkill {
 		compatible = "bcm,bcm43xx_rfkill";
 		pinctrl-names = "default";
 		pinctrl-0 = <&pinctrl_bt_ctrl>;
 		bluetooth-on = <&gpio7 12 0>;
 		bluetooth-reg-on = <&gpio7 12 0>;
 		bluetooth-wake = <&gpio1 4 0>;
-	};
+	};*/
 
 	mxcfb1: fb@0 {
 		compatible = "fsl,mxc_sdc_fb";
@@ -253,6 +258,109 @@
 	pinctrl-0 = <&pinctrl_i2c2_2>;
 	status = "okay";
 
+	pmic: pfuze100@08 {
+		compatible = "fsl,pfuze100";
+		reg = <0x08>;
+
+		regulators {
+			sw1a_reg: sw1ab {
+				regulator-min-microvolt = <300000>;
+				regulator-max-microvolt = <1875000>;
+				regulator-boot-on;
+				regulator-always-on;
+				regulator-ramp-delay = <6250>;
+			};
+
+			sw1c_reg: sw1c {
+				regulator-min-microvolt = <300000>;
+				regulator-max-microvolt = <1875000>;
+				regulator-boot-on;
+				regulator-always-on;
+				regulator-ramp-delay = <6250>;
+			};
+
+			sw2_reg: sw2 {
+				regulator-min-microvolt = <800000>;
+				regulator-max-microvolt = <3300000>;
+				regulator-boot-on;
+				regulator-always-on;
+			};
+
+			sw3a_reg: sw3a {
+				regulator-min-microvolt = <400000>;
+				regulator-max-microvolt = <1975000>;
+				regulator-boot-on;
+				regulator-always-on;
+			};
+
+			sw3b_reg: sw3b {
+				regulator-min-microvolt = <400000>;
+				regulator-max-microvolt = <1975000>;
+				regulator-boot-on;
+				regulator-always-on;
+			};
+
+			sw4_reg: sw4 {
+				regulator-min-microvolt = <800000>;
+				regulator-max-microvolt = <3300000>;
+			};
+
+			swbst_reg: swbst {
+				regulator-min-microvolt = <5000000>;
+				regulator-max-microvolt = <5150000>;
+			};
+
+			snvs_reg: vsnvs {
+				regulator-min-microvolt = <1000000>;
+				regulator-max-microvolt = <3000000>;
+				regulator-boot-on;
+				regulator-always-on;
+			};
+
+			vref_reg: vrefddr {
+				regulator-boot-on;
+				regulator-always-on;
+			};
+
+			vgen1_reg: vgen1 {
+				regulator-min-microvolt = <800000>;
+				regulator-max-microvolt = <1550000>;
+			};
+
+			vgen2_reg: vgen2 {
+				regulator-min-microvolt = <800000>;
+				regulator-max-microvolt = <1550000>;
+				regulator-microvolts = <1500000>;
+				regulator-microvolt = <1500000>;
+				regulator-boot-on;
+				regulator-always-on;
+			};
+
+			vgen3_reg: vgen3 {
+				regulator-min-microvolt = <1800000>;
+				regulator-max-microvolt = <3300000>;
+			};
+
+			vgen4_reg: vgen4 {
+				regulator-min-microvolt = <1800000>;
+				regulator-max-microvolt = <3300000>;
+				regulator-always-on;
+			};
+
+			vgen5_reg: vgen5 {
+				regulator-min-microvolt = <1800000>;
+				regulator-max-microvolt = <3300000>;
+				regulator-always-on;
+			};
+
+			vgen6_reg: vgen6 {
+				regulator-min-microvolt = <1800000>;
+				regulator-max-microvolt = <3300000>;
+				regulator-always-on;
+			};
+		};
+	};
+
 	ov5640_mipi: ov5640_mipi@3c {
 		compatible = "ovti,ov5640_mipi";
 		reg = <0x3c>;
@@ -392,6 +500,7 @@ reference manual.
 			fsl,pins = <
 				MX6QDL_PAD_GPIO_17__GPIO7_IO12	0x000b0		/* bluetooth-reg-on */
 				MX6QDL_PAD_GPIO_4__GPIO1_IO04	0x000b0		/* bluetooth-wake */
+				MX6QDL_PAD_GPIO_5__GPIO1_IO05	0x000b0		/* bluetooth-host-wake */
 			>;
 		};
 	};
@@ -433,6 +542,22 @@ reference manual.
 				MX6QDL_PAD_EIM_D25__UART3_RX_DATA 0x1b0b1
 				MX6QDL_PAD_EIM_D23__UART3_CTS_B   0x1b0b1
 				MX6QDL_PAD_EIM_D31__UART3_RTS_B   0x1b0b1
+			>;
+		};
+	};
+
+	ecspi2 {
+		pinctrl_ecspi2_1: ecspi2grp-1 {
+			fsl,pins = <
+				MX6QDL_PAD_EIM_OE__ECSPI2_MISO  0x1b0b1
+				MX6QDL_PAD_EIM_CS1__ECSPI2_MOSI 0x1b0b1
+				MX6QDL_PAD_EIM_CS0__ECSPI2_SCLK 0x1b0b1
+				MX6QDL_PAD_EIM_RW__GPIO2_IO26 0x000f0b0
+				MX6QDL_PAD_EIM_LBA__GPIO2_IO27 0x000f0b0
+/*
+				MX6QDL_PAD_EIM_RW__ECSPI2_SS0 0x000a0
+				MX6QDL_PAD_EIM_LBA__ECSPI2_SS1 0x000a0
+*/
 			>;
 		};
 	};
@@ -517,7 +642,7 @@ reference manual.
 &usbotg {
 	vbus-supply = <&reg_usb_otg_vbus>;
 	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_usbotg_1>;
+	pinctrl-0 = <&pinctrl_usbotg_2>;
 	disable-over-current;
 	dr_mode = "otg";
 	status = "okay";
@@ -537,6 +662,7 @@ reference manual.
 	pinctrl-0 = <&pinctrl_usdhc2_2>;
 	bus-width = <4>;
 	non-removable;
+	sdio-force-rescan;
 	vmmc-supply = <&reg_3p3v>;
 	keep-power-in-suspend;
 	status = "okay";
@@ -550,3 +676,10 @@ reference manual.
 	status = "okay";
 };
 
+&ecspi2 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_ecspi2_1>;
+	fsl,spi-num-chipselects = <2>;
+	cs-gpios = <&gpio2 26 0 &gpio2 27 0>;
+	status = "okay";
+};

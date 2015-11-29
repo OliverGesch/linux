@@ -7,21 +7,21 @@ config BCMDHD
 config BCMDHD_FW_PATH
 	depends on BCMDHD
 	string "Firmware path"
-	default "/lib/firmware/brcm/"
+	default "/system/etc/firmware/brcm/"
 	---help---
 	  Path to the firmware file.
 
 config BCMDHD_NVRAM_PATH
 	depends on BCMDHD
 	string "NVRAM path"
-	default "/lib/firmware/brcm/"
+	default "/system/etc/firmware/brcm/"
 	---help---
 	  Path to the calibration file.
 
 config BCMDHD_CONFIG_PATH
 	depends on BCMDHD
 	string "Config path"
-	default "/lib/firmware/brcm/config.txt"
+	default "/system/etc/firmware/brcm/config.txt"
 	---help---
 	  Path to the driver configuration file.
 

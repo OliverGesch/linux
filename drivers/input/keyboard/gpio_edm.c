@@ -17,6 +17,44 @@
 #include <linux/of_platform.h>
 #include <linux/of_gpio.h>
 #include <linux/mutex.h>
+#include <linux/delay.h>
+
+//#define EDM1_ENABLE
+//#define PICO_ENABLE
+#define EDM1_SX_ENABLE
+
+#define WB_CHECK				(60) //gpio 2_28
+#define WB_WLAN_REG_ON		(26) // gpio 1_26
+#define WB_WLAN_WAKE			(30) // gpio 1_30
+#define WB_WLAN_HOST_WAKE	(29) // gpio 1_29
+
+#define WB_WLAN_EN_C1			(160) // gpio 6_0
+#define WB_WLAN_REF_ON_C1	(159) //gpio 5_31
+#define WB_BT_EN_C1			(149) // gpio 5_21
+#define WB_BT_WAKE_C1			(158) // gpio 5_30
+#define WB_BT_HOST_WAKE_C1	(148) // gpio 5_20
+
+#define WB_WLAN_EN_B1			(130) // gpio 5_2
+#define WB_WLAN_REF_ON_B1	(61) //gpio 2_29
+#define WB_BT_EN_B1			(77) // gpio 3_13
+#define WB_BT_WAKE_B1			(78) // gpio 3_14
+#define WB_BT_HOST_WAKE_B1	(79) // gpio 3_15
+
+#define EDM1_WLAN_EN			(160) // gpio 6_0
+#define EDM1_WLAN_REF_ON		(159) //gpio 5_31
+#define EDM1_WLAN_REG_ON		(26) // gpio 1_26
+#define EDM1_WLAN_WAKE		(30) // gpio 1_30
+#define EDM1_WLAN_HOST_WAKE	(29) // gpio 1_29
+
+#define EDM1_BT_EN				(149) // gpio 5_21
+#define EDM1_BT_WAKE			(158) // gpio 5_30
+#define EDM1_BT_HOST_WAKE	(148) // gpio 5_20
+
+#define PICO_WLAN_REG_ON		(7) // gpio 1_7
+#define PICO_WLAN_HOST_WAKE	(203) // gpio 7_11
+#define PICO_BT_EN				(204) // gpio 7_12
+#define PICO_BT_WAKE			(4) // gpio 1_4
+#define PICO_BT_HOST_WAKE		(5) // gpio 1_5
 
 struct gpio_edm_data {
 		unsigned int gpio;
@@ -28,6 +66,157 @@ struct gpio_edm_data {
 static unsigned int gpio_num=0;
 static unsigned int *gpio_location=NULL;
 static DEFINE_MUTEX(gpio_lock);
+
+static int edm1_gpio_init(void)
+{
+	int val;
+	int error;
+
+	mutex_lock(&gpio_lock);
+	error = gpio_request(EDM1_WLAN_EN, "EDM1_WLAN_EN");
+	gpio_direction_output(EDM1_WLAN_EN,1);
+	error = gpio_export(EDM1_WLAN_EN, true);
+	msleep(5);
+	error = gpio_request(EDM1_WLAN_REF_ON, "EDM1_WLAN_REF_ON");
+	gpio_direction_output(EDM1_WLAN_REF_ON,1);
+	error = gpio_export(EDM1_WLAN_REF_ON, true);
+	msleep(5);
+	error = gpio_request(EDM1_WLAN_REG_ON, "EDM1_WLAN_REG_ON");
+	gpio_direction_output(EDM1_WLAN_REG_ON,1);
+	error = gpio_export(EDM1_WLAN_REG_ON, true);
+	msleep(5);
+	error = gpio_request(EDM1_WLAN_WAKE, "EDM1_WLAN_WAKE");
+	gpio_direction_output(EDM1_WLAN_WAKE,1);
+	error = gpio_export(EDM1_WLAN_WAKE, true);
+	msleep(5);
+	error = gpio_request(EDM1_WLAN_HOST_WAKE, "WB_WLAN_HOST_WAKE");
+	gpio_direction_input(EDM1_WLAN_HOST_WAKE);
+	error = gpio_export(EDM1_WLAN_HOST_WAKE, true);
+	msleep(5);
+	error = gpio_request(EDM1_BT_EN, "WB_BT_EN");
+	gpio_direction_output(EDM1_BT_EN,1);
+	error = gpio_export(EDM1_BT_EN, true);
+	msleep(5);
+	error = gpio_request(EDM1_BT_WAKE, "WB_BT_WAKE");
+	gpio_direction_output(EDM1_BT_WAKE,1);
+	error = gpio_export(EDM1_BT_WAKE, true);
+	msleep(5);
+	error = gpio_request(EDM1_BT_HOST_WAKE, "WB_BT_HOST_WAKE");
+	gpio_direction_input(EDM1_BT_HOST_WAKE);
+	error = gpio_export(EDM1_BT_HOST_WAKE, true);
+	mutex_unlock(&gpio_lock);
+}
+
+static int pico_gpio_init(void)
+{
+	int val;
+	int error;
+
+	mutex_lock(&gpio_lock);
+	error = gpio_request(PICO_WLAN_REG_ON, "PICO_WLAN_REG_ON");
+	gpio_direction_output(PICO_WLAN_REG_ON,1);
+	error = gpio_export(PICO_WLAN_REG_ON, true);
+	msleep(5);
+	error = gpio_request(PICO_WLAN_HOST_WAKE, "PICO_WLAN_HOST_WAKE");
+	gpio_direction_input(PICO_WLAN_HOST_WAKE);
+	error = gpio_export(PICO_WLAN_HOST_WAKE, true);
+	msleep(5);
+	error = gpio_request(PICO_BT_EN, "PICO_BT_EN");
+	gpio_direction_output(PICO_BT_EN,1);
+	error = gpio_export(PICO_BT_EN, true);
+	msleep(5);
+	error = gpio_request(PICO_BT_WAKE, "PICO_BT_WAKE");
+	gpio_direction_output(PICO_BT_WAKE,1);
+	error = gpio_export(PICO_BT_WAKE, true);
+	msleep(5);
+	error = gpio_request(PICO_BT_HOST_WAKE, "PICO_BT_HOST_WAKE");
+	gpio_direction_input(PICO_BT_HOST_WAKE);
+	error = gpio_export(PICO_BT_HOST_WAKE, true);
+	mutex_unlock(&gpio_lock);
+}
+
+
+static int wondboard_gpio_init(void)
+{
+	int val;
+	int error;
+
+	mutex_lock(&gpio_lock);
+	val=gpio_get_value(WB_CHECK);
+	if(val) { //C1
+		error = gpio_request(WB_WLAN_EN_C1, "WB_WLAN_EN");
+		gpio_direction_output(WB_WLAN_EN_C1,1);
+		error = gpio_export(WB_WLAN_EN_C1, true);
+		msleep(5);
+		error = gpio_request(WB_WLAN_REF_ON_C1, "WB_WLAN_REF_ON");
+		gpio_direction_output(WB_WLAN_REF_ON_C1,1);
+		error = gpio_export(WB_WLAN_REF_ON_C1, true);
+		msleep(5);
+		error = gpio_request(WB_WLAN_REG_ON, "WB_WLAN_REG_ON");
+		gpio_direction_output(WB_WLAN_REG_ON,1);
+		error = gpio_export(WB_WLAN_REG_ON, true);
+		msleep(5);
+		error = gpio_request(WB_WLAN_WAKE, "WB_WLAN_WAKE");
+		gpio_direction_output(WB_WLAN_WAKE,1);
+		error = gpio_export(WB_WLAN_WAKE, true);
+		msleep(5);
+		error = gpio_request(WB_WLAN_HOST_WAKE, "WB_WLAN_HOST_WAKE");
+		gpio_direction_input(WB_WLAN_HOST_WAKE);
+		error = gpio_export(WB_WLAN_HOST_WAKE, true);
+		msleep(5);
+		error = gpio_request(WB_BT_EN_C1, "WB_BT_EN");
+		gpio_direction_output(WB_BT_EN_C1,1);
+		error = gpio_export(WB_BT_EN_C1, true);
+		msleep(5);
+		error = gpio_request(WB_BT_WAKE_C1, "WB_BT_WAKE");
+		gpio_direction_output(WB_BT_WAKE_C1,1);
+		error = gpio_export(WB_BT_WAKE_C1, true);
+		msleep(5);
+		error = gpio_request(WB_BT_HOST_WAKE_C1, "WB_BT_HOST_WAKE");
+		gpio_direction_input(WB_BT_HOST_WAKE_C1);
+		error = gpio_export(WB_BT_HOST_WAKE_C1, true);
+
+	}else { // B1
+		error = gpio_request(WB_WLAN_EN_B1, "WB_WLAN_EN");
+		gpio_direction_output(WB_WLAN_EN_B1,0);
+		msleep(11);
+		gpio_direction_output(WB_WLAN_EN_B1,1);
+		error = gpio_export(WB_WLAN_EN_B1, true);
+
+		msleep(5);
+		error = gpio_request(WB_WLAN_REF_ON_B1, "WB_WLAN_REF_ON");
+		gpio_direction_output(WB_WLAN_REF_ON_B1,1);
+		error = gpio_export(WB_WLAN_REF_ON_B1, true);
+		msleep(5);
+		error = gpio_request(WB_WLAN_REG_ON, "WB_WLAN_REG_ON");
+		gpio_direction_output(WB_WLAN_REG_ON,1);
+		error = gpio_export(WB_WLAN_REG_ON, true);
+		msleep(5);
+		error = gpio_request(WB_WLAN_WAKE, "WB_WLAN_WAKE");
+		gpio_direction_output(WB_WLAN_WAKE,1);
+		error = gpio_export(WB_WLAN_WAKE, true);
+		msleep(5);
+		error = gpio_request(WB_WLAN_HOST_WAKE, "WB_WLAN_HOST_WAKE");
+		gpio_direction_input(WB_WLAN_HOST_WAKE);
+		error = gpio_export(WB_WLAN_HOST_WAKE, true);
+		msleep(5);
+		error = gpio_request(WB_BT_EN_B1, "WB_BT_EN");
+		gpio_direction_output(WB_BT_EN_B1,1);
+		error = gpio_export(WB_BT_EN_B1, true);
+		msleep(5);
+		error = gpio_request(WB_BT_WAKE_B1, "WB_BT_WAKE");
+		gpio_direction_output(WB_BT_WAKE_B1,1);
+		error = gpio_export(WB_BT_WAKE_B1, true);
+		msleep(5);
+		error = gpio_request(WB_BT_HOST_WAKE_B1, "WB_BT_HOST_WAKE");
+		gpio_direction_input(WB_BT_HOST_WAKE_B1);
+		error = gpio_export(WB_BT_HOST_WAKE_B1, true);
+	}
+	mutex_unlock(&gpio_lock);
+
+	return 0;
+}
+
 
 static int gpio_edm_setup_key(struct platform_device *pdev,
 				const struct gpio_edm_data *edm_data)
@@ -62,6 +251,15 @@ static int gpio_edm_setup_key(struct platform_device *pdev,
 	}
 	else
 		goto fail;
+
+	if(!strcmp(desc,"WB_CHECK"))
+		wondboard_gpio_init();
+
+#ifdef EDM1_ENABLE
+	edm1_gpio_init();
+#elif defined PICO_ENABLE
+	pico_gpio_init();
+#endif
 
 	return 0;
 
@@ -255,7 +453,8 @@ static void __exit gpio_edm_exit(void)
 	platform_driver_unregister(&gpio_edm_device_driver);
 }
 
-late_initcall(gpio_edm_init);
+fs_initcall(gpio_edm_init);
+//late_initcall(gpio_edm_init);
 module_exit(gpio_edm_exit);
 
 MODULE_LICENSE("GPL");

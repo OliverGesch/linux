@@ -37,6 +37,8 @@
 #include <asm/mach/arch.h>
 #include <asm/mach/map.h>
 #include <asm/system_misc.h>
+#include <linux/memblock.h>
+#include <asm/setup.h>
 
 #include "common.h"
 #include "cpuidle.h"
@@ -174,39 +176,7 @@ static int ar8031_phy_fixup(struct phy_device *dev)
 	return 0;
 }
 
-static int ar8035_phy_fixup(struct phy_device *dev)
-{
-	u16 val;
-
-	/* Ar803x phy SmartEEE feature cause link status generates glitch,
-	 * which cause ethernet link down/up issue, so disable SmartEEE
-	 */
-	phy_write(dev, 0xd, 0x3);
-	phy_write(dev, 0xe, 0x805d);
-	phy_write(dev, 0xd, 0x4003);
-
-	val = phy_read(dev, 0xe);
-	phy_write(dev, 0xe, val & ~(1 << 8));
-
-	/*
-	 * Enable 125MHz clock from CLK_25M on the AR8031.  This
-	 * is fed in to the IMX6 on the ENET_REF_CLK (V22) pad.
-	 * Also, introduce a tx clock delay.
-	 *
-	 * This is the same as is the AR8031 fixup.
-	 */
-	ar8031_phy_fixup(dev);
-
-	/*check phy power*/
-	val = phy_read(dev, 0x0);
-	if (val & BMCR_PDOWN)
-		phy_write(dev, 0x0, val & ~BMCR_PDOWN);
-
-	return 0;
-}
-
 #define PHY_ID_AR8031	0x004dd074
-#define PHY_ID_AR8035	0x004dd072
 
 static void __init imx6q_enet_phy_init(void)
 {
@@ -217,8 +187,6 @@ static void __init imx6q_enet_phy_init(void)
 				ksz9031rn_phy_fixup);
 		phy_register_fixup_for_uid(PHY_ID_AR8031, 0xffffffff,
 				ar8031_phy_fixup);
-		phy_register_fixup_for_uid(PHY_ID_AR8035, 0xffffffef,
-				ar8035_phy_fixup);
 	}
 }
 
@@ -262,6 +230,28 @@ static void __init imx6q_csi_mux_init(void)
 	} else {
 		pr_err("%s(): failed to find fsl,imx6q-iomux-gpr regmap\n",
 		       __func__);
+	}
+}
+
+/*
+ * Init GPIO PCIE_PWR_EN to keep power supply to miniPCIE 3G modem
+ *
+*/
+static void __init imx6q_mini_pcie_init(void)
+{
+	struct device_node *np = NULL;
+	int ret, power_on_gpio;
+	np = of_find_node_by_name(NULL, "minipcie_ctrl");
+	if (!np)
+		return;
+
+	power_on_gpio = of_get_named_gpio(np, "power-on-gpio", 0);
+	if (gpio_is_valid(power_on_gpio)) {
+		ret = gpio_request_one(power_on_gpio, GPIOF_OUT_INIT_HIGH,
+			"miniPCIE Power On");
+		pr_warn("!!request miniPCIE Power On gpio\n");
+		if (ret)
+			pr_warn("failed to request miniPCIE Power On gpio\n");
 	}
 }
 
@@ -373,6 +363,7 @@ static void __init imx6q_init_machine(void)
 	imx_anatop_init();
 	imx6_pm_init();
 	imx6q_csi_mux_init();
+	imx6q_mini_pcie_init();
 }
 
 #define OCOTP_CFG3			0x440
@@ -549,6 +540,45 @@ static const char *imx6q_dt_compat[] __initdata = {
 	NULL,
 };
 
+extern unsigned long int ramoops_phys_addr;
+extern unsigned long int ramoops_mem_size;
+static void imx6q_reserve(void)
+{
+	phys_addr_t phys;
+	phys_addr_t max_phys;
+	struct meminfo *mi;
+	struct membank *bank;
+
+#ifdef CONFIG_PSTORE_RAM
+	mi = &meminfo;
+	if (!mi) {
+		pr_err("no memory reserve for ramoops.\n");
+		return;
+	}
+
+	/* use memmory last bank for ram console store */
+	bank = &mi->bank[mi->nr_banks - 1];
+	if (!bank) {
+		pr_err("no memory reserve for ramoops.\n");
+		return;
+	}
+	max_phys = bank->start + bank->size;
+	/* reserve 64M for uboot avoid ram console data is cleaned by uboot */
+	phys = memblock_alloc_base(SZ_1M, SZ_4K, max_phys - SZ_64M);
+	if (phys) {
+		memblock_remove(phys, SZ_1M);
+		memblock_reserve(phys, SZ_1M);
+		ramoops_phys_addr = phys;
+		ramoops_mem_size = SZ_1M;
+	} else {
+		ramoops_phys_addr = 0;
+		ramoops_mem_size = 0;
+		pr_err("no memory reserve for ramoops.\n");
+	}
+#endif
+	return;
+}
+
 DT_MACHINE_START(IMX6Q, "Freescale i.MX6 Quad/DualLite (Device Tree)")
 	/*
 	 * i.MX6Q/DL maps system memory at 0x10000000 (offset 256MiB), and
@@ -562,6 +592,7 @@ DT_MACHINE_START(IMX6Q, "Freescale i.MX6 Quad/DualLite (Device Tree)")
 	.init_time	= imx6q_timer_init,
 	.init_machine	= imx6q_init_machine,
 	.init_late      = imx6q_init_late,
-	.dt_compat	= imx6q_dt_compat,
+	.dt_compat	 = imx6q_dt_compat,
+	.reserve     = imx6q_reserve,
 	.restart	= mxc_restart,
 MACHINE_END

@@ -95,5 +95,6 @@ config WAND_RFKILL
 
 config BCM43XX_RFKILL
 	tristate "Broadcom bcm43xx RF Kill support"
+	depends on SOC_IMX6SX
 	default m
 	select RFKILL

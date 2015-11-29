@@ -47,16 +47,15 @@
 		};
 	};
 
-	leds {
+/*	leds {
 		compatible = "gpio-leds";
-
 		charger-led {
 			gpios = <&gpio1 2 0>;
 			linux,default-trigger = "max8903-charger-charging";
 			retain-state-suspended;
 		};
 	};
-
+*/
 	regulators {
 		compatible = "simple-bus";
 
@@ -110,18 +109,21 @@
 			gpios = <&gpio3 29 1>;
 			linux,code = <116>; /* KEY_POWER */
 			gpio-key,wakeup;
+			debounce-interval = <1>;
 		};
 
 		volume-up {
 			label = "Volume Up";
 			gpios = <&gpio1 4 1>;
 			linux,code = <115>; /* KEY_VOLUMEUP */
+			debounce-interval = <1>;
 		};
 
 		volume-down {
 			label = "Volume Down";
 			gpios = <&gpio1 5 1>;
 			linux,code = <114>; /* KEY_VOLUMEDOWN */
+			debounce-interval = <1>;
 		};
 	};
 
@@ -205,11 +207,23 @@
 		status = "okay";
 	};
 
-	backlight {
+	pwm-backlight {
 		compatible = "pwm-backlight";
-		pwms = <&pwm1 0 5000000>;
-		brightness-levels = <0 4 8 16 32 64 128 255>;
-		default-brightness-level = <7>;
+		pwms = <&pwm1 0 50000>;
+		brightness-levels = <
+			0  /*1  2  3  4  5  6*/  7  8  9
+			10 11 12 13 14 15 16 17 18 19
+			20 21 22 23 24 25 26 27 28 29
+			30 31 32 33 34 35 36 37 38 39
+			40 41 42 43 44 45 46 47 48 49
+			50 51 52 53 54 55 56 57 58 59
+			60 61 62 63 64 65 66 67 68 69
+			70 71 72 73 74 75 76 77 78 79
+			80 81 82 83 84 85 86 87 88 89
+			90 91 92 93 94 95 96 97 98 99
+			100
+			>;
+		default-brightness-level = <94>;
 	};
 
 	v4l2_cap_0 {
@@ -238,6 +252,37 @@
 		reset-gpios = <&gpio6 11 GPIO_ACTIVE_LOW>;
 		reset-delay-us = <50>;
 		#reset-cells = <0>;
+	};
+
+	minipcie_ctrl {
+		power-on-gpio = <&gpio3 19 0>;
+	};
+
+	bt_rfkill {
+		compatible = "fsl,mxc_bt_rfkill";
+		bt-power-gpios = <&gpio1 2 0>;
+		status = "okay";
+	};
+
+	consumer_ir {
+		compatible = "fsl,mxc-ir";
+		pwms = <&pwm2 0 5000000>;
+		epit = <0>;
+		status = "okay";
+	};
+
+	gps_ctrl {
+		gps-reset-b = <&gpio2 28 GPIO_ACTIVE_HIGH>;
+		power-on-gpio = <&gpio3 0 GPIO_ACTIVE_HIGH>;
+	};
+
+	ramoops_device {
+		compatible = "fsl,mxc_ramoops";
+		record_size = <524288>; /*512K*/
+		console_size = <262144>; /*256K*/
+		ftrace_size = <262144>;  /*256K*/
+		dump_oops = <1>;
+		status = "okay";
 	};
 };
 
@@ -440,7 +485,7 @@
 	mag3110@0e {
 		compatible = "fsl,mag3110";
 		reg = <0x0e>;
-		position = <2>;
+		position = <1>;
 		vdd-supply = <&reg_sensor>;
 		vddio-supply = <&reg_sensor>;
 		interrupt-parent = <&gpio3>;
@@ -495,8 +540,10 @@
 				MX6QDL_PAD_EIM_D22__GPIO3_IO22  0x80000000
 				MX6QDL_PAD_NANDF_CS0__GPIO6_IO11 0x80000000
 				MX6QDL_PAD_NANDF_CS1__GPIO6_IO14 0x80000000
+				MX6QDL_PAD_EIM_DA0__GPIO3_IO00 0xc0000000
 				MX6QDL_PAD_EIM_EB3__GPIO2_IO31 0x80000000
 				MX6QDL_PAD_EIM_D16__GPIO3_IO16 0x80000000
+				MX6QDL_PAD_EIM_EB0__GPIO2_IO28 0x80000000
 				MX6QDL_PAD_EIM_DA9__GPIO3_IO09 0x80000000
 				MX6QDL_PAD_GPIO_4__GPIO1_IO04 0x80000000
 				MX6QDL_PAD_GPIO_5__GPIO1_IO05 0x80000000
@@ -504,7 +551,7 @@
 				MX6QDL_PAD_SD3_RST__GPIO7_IO08 0x80000000
 				MX6QDL_PAD_GPIO_9__GPIO1_IO09 0x80000000
 				MX6QDL_PAD_GPIO_1__WDOG2_B 0x80000000
-				MX6QDL_PAD_GPIO_2__GPIO1_IO02 0x80000000
+				MX6QDL_PAD_GPIO_2__GPIO1_IO02 0x1b0b0
 				MX6QDL_PAD_SD1_CMD__GPIO1_IO18 0x80000000
 			>;
 		};
@@ -600,6 +647,12 @@
 	status = "okay";
 };
 
+&pwm2 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_pwm2_1>;
+	status = "okay";
+};
+
 &ssi2 {
 	fsl,mode = "i2s-slave";
 	status = "okay";
@@ -608,6 +661,19 @@
 &uart1 {
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_uart1_1>;
+	status = "okay";
+};
+
+&uart3 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_uart3_1>;
+	status = "okay";
+};
+
+&uart5 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_uart5_1>;
+	fsl,uart-has-rtscts;
 	status = "okay";
 };
 
@@ -658,4 +724,30 @@
 
 &vpu {
 	pu-supply = <&pu_dummy>; /* ldo-bypass:use pu_dummy if VDDSOC share with VDDPU */
+};
+
+&epit1 {
+	epit-id = < 0 >;
+	status = "okay";
+};
+
+&epit2 {
+	epit-id = < 1 >;
+	status = "okay";
+};
+
+&caam_sm  {
+	status = "disabled";
+};
+
+&irq_sec_vio  {
+	status = "disabled";
+};
+
+&caam_snvs  {
+	status = "disabled";
+};
+
+&crypto {
+	status = "disabled";
 };

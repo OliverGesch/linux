@@ -661,13 +661,19 @@
 			};
 
 			epit1: epit@020d0000 { /* EPIT1 */
+				compatible = "fsl,imx6q-epit";
 				reg = <0x020d0000 0x4000>;
 				interrupts = <0 56 0x04>;
+				clocks = <&clks 62>, <&clks 216>;
+				clock-names = "ipg", "per";
 			};
 
 			epit2: epit@020d4000 { /* EPIT2 */
+				compatible = "fsl,imx6q-epit";
 				reg = <0x020d4000 0x4000>;
 				interrupts = <0 57 0x04>;
+				clocks = <&clks 62>, <&clks 217>;
+				clock-names = "ipg", "per";
 			};
 
 			src: src@020d8000 {
@@ -1056,6 +1062,12 @@
 			resets = <&src 2>;
 			bypass_reset = <0>;
 		};
+
+                imx_ion {
+                        compatible = "fsl,mxc-ion";
+                        fsl,heap-id = <0>;
+                        fsl,heap-cacheable = <1>;
+                };
 	};
 };
 
@@ -1483,6 +1495,14 @@
 		};
 	};
 
+	pwm2 {
+		pinctrl_pwm2_1: pwm2grp-1 {
+		fsl,pins = <
+				MX6QDL_PAD_DISP0_DAT9__PWM2_OUT 0x1b0b1
+			>;
+		};
+	};
+
 	pwm3 {
 		pinctrl_pwm3_1: pwm3grp-1 {
 			fsl,pins = <
@@ -1536,10 +1556,8 @@
 	uart3 {
 		pinctrl_uart3_1: uart3grp-1 {
 			fsl,pins = <
-				MX6QDL_PAD_SD4_CLK__UART3_RX_DATA 0x1b0b1
-				MX6QDL_PAD_SD4_CMD__UART3_TX_DATA 0x1b0b1
-				MX6QDL_PAD_EIM_D30__UART3_CTS_B   0x1b0b1
-				MX6QDL_PAD_EIM_EB3__UART3_RTS_B   0x1b0b1
+				MX6QDL_PAD_EIM_D24__UART3_TX_DATA 0x1b0b1
+				MX6QDL_PAD_EIM_D25__UART3_RX_DATA 0x1b0b1
 			>;
 		};
 
@@ -1567,6 +1585,16 @@
 			fsl,pins = <
 				MX6QDL_PAD_KEY_COL0__UART4_TX_DATA 0x1b0b1
 				MX6QDL_PAD_KEY_ROW0__UART4_RX_DATA 0x1b0b1
+			>;
+		};
+	};
+	uart5 {
+		pinctrl_uart5_1: uart5grp-1 {
+			fsl,pins = <
+				MX6QDL_PAD_KEY_COL1__UART5_TX_DATA 0x1b0b1
+				MX6QDL_PAD_KEY_ROW1__UART5_RX_DATA 0x1b0b1
+				MX6QDL_PAD_KEY_COL4__UART5_RTS_B   0x1b0b1
+				MX6QDL_PAD_KEY_ROW4__UART5_CTS_B   0x1b0b1
 			>;
 		};
 	};

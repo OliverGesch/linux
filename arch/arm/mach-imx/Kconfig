@@ -49,7 +49,7 @@ config MXC_DEBUG_BOARD
 	  interrupt control and various board functions.
 
 config HAVE_EPIT
-	bool
+	bool "Enable MXC EPIT driver"
 
 config MXC_USE_EPIT
 	bool "Use EPIT instead of GPT"
@@ -881,7 +881,34 @@ config SOC_VF610
 	help
 	  This enable support for Freescale Vybrid VF610 processor.
 
+config MXC_REBOOT_MFGMODE
+	bool "MFG mode setting"
+
+config MXC_REBOOT_ANDROID_CMD
+	bool "Android reboot setting"
+
 endif
+
+config MACH_IMX_BLUETOOTH_RFKILL
+	tristate "i.MX Bluetooth rfkill interface support"
+	depends on RFKILL
+
+	help
+	Say Y to get the standard rfkill interface of Bluetooth
+
+config MX6_IR
+	bool "MX6 IR Support"
+	depends on PWM_IMX
+	default n
+	help
+	 This config is for MX6 IR support. Enable it if hardware supported.
+
+config MX6_RAMOOPS
+	bool "MX6 ramoops Support"
+	depends on PSTORE_RAM
+	default n
+	help
+	 This config is for MX6 ramoop support
 
 source "arch/arm/mach-imx/devices/Kconfig"
 

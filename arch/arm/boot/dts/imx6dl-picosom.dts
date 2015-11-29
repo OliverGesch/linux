@@ -15,8 +15,8 @@
 #include "imx6qdl-picosom.dtsi"
 
 / {
-	model = "Technexion PicoSOM DualLite/Solo board";
-	compatible = "fsl,picosom", "fsl,imx6dl";
+	model = "Wandboard i.MX6 Dual Lite Board";
+	compatible = "wand,imx6dl-wandboard", "fsl,imx6dl";
 };
 
 &ldb {
