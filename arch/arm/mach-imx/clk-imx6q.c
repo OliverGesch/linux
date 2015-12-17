@@ -294,6 +294,7 @@ static void init_ldb_clks(void)
 static void __init imx6q_clocks_init(struct device_node *ccm_node)
 {
 	struct device_node *np;
+	struct resource res;
 	void __iomem *base;
 	int i, irq;
 	u32 reg;
@@ -789,6 +790,9 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
 	base = of_iomap(np, 0);
 	WARN_ON(!base);
 	irq = irq_of_parse_and_map(np, 0);
-	mxc_timer_init(base, irq);
+	if (of_address_to_resource(np, 0, &res))
+		BUG();
+
+	mxc_timer_init(base, res.start, irq);
 }
 CLK_OF_DECLARE(imx6q, "fsl,imx6q-ccm", imx6q_clocks_init);

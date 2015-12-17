@@ -1,4 +1,3 @@
-
 #include <linux/module.h>
 #include <linux/io.h>
 #include <linux/of.h>
@@ -139,3 +138,4 @@ free_soc:
 	kfree(soc_dev_attr);
 	return NULL;
 }
+
