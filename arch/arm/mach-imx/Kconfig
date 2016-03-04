@@ -833,6 +833,7 @@ config SOC_IMX6Q
 	select SOC_IMX6
 	select ZONE_DMA
 	select MXC_MLB150
+	select ARM_GLOBAL_TIMER if SMP && IPIPE
 
 	help
 	  This enables support for Freescale i.MX6 Quad processor.

@@ -320,6 +320,10 @@ static void __init mx5_clocks_common_init(unsigned long rate_ckil,
 	clk_prepare_enable(clk[IMX5_CLK_TMAX1]);
 	clk_prepare_enable(clk[IMX5_CLK_TMAX2]); /* esdhc2, fec */
 	clk_prepare_enable(clk[IMX5_CLK_TMAX3]); /* esdhc1, esdhc4 */
+
+#ifdef CONFIG_IPIPE
+	mxc_pic_muter_register();
+#endif
 }
 
 static void __init mx50_clocks_init(struct device_node *np)
@@ -457,7 +461,8 @@ int __init mx51_clocks_init(unsigned long rate_ckil, unsigned long rate_osc,
 	clk_set_rate(clk[IMX5_CLK_ESDHC_B_PODF], 166250000);
 
 	/* System timer */
-	mxc_timer_init(MX51_IO_ADDRESS(MX51_GPT1_BASE_ADDR), MX51_INT_GPT);
+	mxc_timer_init(MX51_IO_ADDRESS(MX51_GPT1_BASE_ADDR), 
+		       MX51_GPT1_BASE_ADDR, MX51_INT_GPT);
 
 	clk_prepare_enable(clk[IMX5_CLK_IIM_GATE]);
 	imx_print_silicon_rev("i.MX51", mx51_revision());
